@@ -350,3 +350,31 @@ CREATE TRIGGER on_auth_user_created
 CREATE INDEX IF NOT EXISTS idx_website_analyses_user_id ON website_analyses(user_id);
 CREATE INDEX IF NOT EXISTS idx_documents_user_id ON documents(user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_conversations_user_id ON chat_conversations(user_id);
+ALTER TABLE public.documents
+  ADD COLUMN IF NOT EXISTS storage_path text,
+  ADD COLUMN IF NOT EXISTS mime_type text,
+  ADD COLUMN IF NOT EXISTS file_size bigint;
+
+CREATE INDEX IF NOT EXISTS idx_activity_logs_user_created
+  ON public.activity_logs (user_id, created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_website_analyses_user_created
+  ON public.website_analyses (user_id, created_at DESC);
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('user-documents', 'user-documents', false)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "users_manage_own_documents" ON storage.objects;
+
+CREATE POLICY "users_manage_own_documents"
+ON storage.objects
+FOR ALL TO authenticated
+USING (
+  bucket_id = 'user-documents'
+  AND (storage.foldername(name))[1] = auth.uid()::text
+)
+WITH CHECK (
+  bucket_id = 'user-documents'
+  AND (storage.foldername(name))[1] = auth.uid()::text
+);
