@@ -1,14 +1,13 @@
-/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 type Action =
-  | 'chat'
-  | 'simplifyText'
-  | 'translateText'
-  | 'analyzeAccessibilityIssues'
-  | 'analyzeWebsite'
-  | 'summarizeDocument';
+  | "chat"
+  | "simplifyText"
+  | "translateText"
+  | "analyzeAccessibilityIssues"
+  | "analyzeWebsite"
+  | "summarizeDocument";
 
 interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
+  role: "user" | "assistant" | "system";
   content: string;
 }
 
@@ -24,33 +23,37 @@ interface RequestBody {
 
 interface WebsiteIssue {
   title: string;
-  severity: 'critical' | 'serious' | 'moderate' | 'minor';
+  severity: "critical" | "serious" | "moderate" | "minor";
   category: string;
   description: string;
   recommendation: string;
   wcag: string;
   count: number;
 }
+// @ts-ignore Supabase Edge Functions provide Deno at runtime
+const OPENAI_API_KEY = Deno.env.get("AI_API_KEY");
 
-const OPENAI_API_KEY = Deno.env.get('AI_API_KEY');
+const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
 
-const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
-
-const OPENAI_MODEL = 'gpt-4o-mini';
+const OPENAI_MODEL = "gpt-4o-mini";
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Content-Type': 'application/json',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Content-Type": "application/json",
 };
 
 const systemPrompt = `
 You are SAARTHI AI, a helpful accessibility assistant.
 
-Help users understand websites, documents, accessibility issues,
-translations, and digital services.
+Help users understand:
+- websites
+- documents
+- accessibility issues
+- translations
+- digital services
 
 Be clear, concise, practical, and friendly.
 
@@ -65,7 +68,7 @@ function json(data: unknown, status = 200): Response {
 }
 
 function cleanText(value: unknown): string {
-  return typeof value === 'string' ? value.trim() : '';
+  return typeof value === "string" ? value.trim() : "";
 }
 
 function isSafeUrl(value: string): boolean {
@@ -73,20 +76,20 @@ function isSafeUrl(value: string): boolean {
     const parsedUrl = new URL(value);
 
     if (
-      parsedUrl.protocol !== 'http:' &&
-      parsedUrl.protocol !== 'https:'
+      parsedUrl.protocol !== "http:" &&
+      parsedUrl.protocol !== "https:"
     ) {
       return false;
     }
 
     const host = parsedUrl.hostname.toLowerCase();
 
-    // Block localhost and local/internal hosts.
+    // Block local/internal hosts.
     if (
-      host === 'localhost' ||
-      host.endsWith('.local') ||
-      host === '0.0.0.0' ||
-      host === '::1'
+      host === "localhost" ||
+      host.endsWith(".local") ||
+      host === "0.0.0.0" ||
+      host === "::1"
     ) {
       return false;
     }
@@ -110,48 +113,41 @@ function isSafeUrl(value: string): boolean {
 function inspectHtml(html: string): WebsiteIssue[] {
   const issues: WebsiteIssue[] = [];
 
-  /*
-   * 1. Images without alt text
-   */
+  // 1. Images without alt text
   const imagesWithoutAlt = Array.from(
-    html.matchAll(
-      /<img\b(?![^>]*\balt\s*=)[^>]*>/gi,
-    ),
+    html.matchAll(/<img\b(?![^>]*\balt\s*=)[^>]*>/gi)
   ).length;
 
   if (imagesWithoutAlt > 0) {
     issues.push({
-      title: 'Images missing alternative text',
-      severity: 'serious',
-      category: 'Images',
+      title: "Images missing alternative text",
+      severity: "serious",
+      category: "Images",
       description:
-        'Some images do not provide alternative text for screen-reader users.',
+        "Some images do not provide alternative text for screen-reader users.",
       recommendation:
         'Add meaningful alt text, or alt="" for decorative images.',
-      wcag: '1.1.1',
+      wcag: "1.1.1",
       count: imagesWithoutAlt,
     });
   }
 
-  /*
-   * 2. Form inputs without accessible names
-   */
+  // 2. Form inputs without accessible names
   const inputsWithoutName = Array.from(
-    html.matchAll(/<input\b[^>]*>/gi),
+    html.matchAll(/<input\b[^>]*>/gi)
   ).filter((match) => {
     const tag = match[0];
 
     // Ignore hidden and button-like inputs.
     if (
       /\btype\s*=\s*["']?(hidden|submit|button|reset|image)["']?/i.test(
-        tag,
+        tag
       )
     ) {
       return false;
     }
 
-    const hasAriaLabel =
-      /\baria-label\s*=/i.test(tag);
+    const hasAriaLabel = /\baria-label\s*=/i.test(tag);
 
     const hasAriaLabelledBy =
       /\baria-labelledby\s*=/i.test(tag);
@@ -161,84 +157,78 @@ function inspectHtml(html: string): WebsiteIssue[] {
 
   if (inputsWithoutName > 0) {
     issues.push({
-      title: 'Form controls may be unlabeled',
-      severity: 'serious',
-      category: 'Forms',
+      title: "Form controls may be unlabeled",
+      severity: "serious",
+      category: "Forms",
       description:
-        'Inputs without an accessible name were detected.',
+        "Inputs without an accessible name were detected.",
       recommendation:
-        'Use a visible label linked by for/id, aria-label, or aria-labelledby.',
-      wcag: '1.3.1',
+        "Use a visible label linked by for/id, aria-label, or aria-labelledby.",
+      wcag: "1.3.1",
       count: inputsWithoutName,
     });
   }
 
-  /*
-   * 3. Empty links
-   */
+  // 3. Empty links
   const emptyLinks = Array.from(
     html.matchAll(
-      /<a\b[^>]*>\s*(?:<img\b[^>]*>)?\s*<\/a>/gi,
-    ),
+      /<a\b[^>]*>\s*(?:<img\b[^>]*>)?\s*<\/a>/gi
+    )
   ).length;
 
   if (emptyLinks > 0) {
     issues.push({
-      title: 'Empty links',
-      severity: 'serious',
-      category: 'Navigation',
+      title: "Empty links",
+      severity: "serious",
+      category: "Navigation",
       description:
-        'Links without readable text or an accessible image description were found.',
+        "Links without readable text or an accessible image description were found.",
       recommendation:
-        'Give every link an accessible name describing its destination.',
-      wcag: '2.4.4',
+        "Give every link an accessible name describing its destination.",
+      wcag: "2.4.4",
       count: emptyLinks,
     });
   }
 
-  /*
-   * 4. Heading hierarchy
-   */
+  // 4. Heading hierarchy
   const headings = Array.from(
-    html.matchAll(/<h([1-6])\b[^>]*>/gi),
+    html.matchAll(/<h([1-6])\b[^>]*>/gi)
   ).map((match) => Number(match[1]));
 
   const skippedHeadings = headings.filter(
     (level, index) =>
       index > 0 &&
-      level > headings[index - 1] + 1,
+      level > headings[index - 1] + 1
   ).length;
 
   if (skippedHeadings > 0) {
     issues.push({
-      title: 'Heading levels are skipped',
-      severity: 'moderate',
-      category: 'Structure',
+      title: "Heading levels are skipped",
+      severity: "moderate",
+      category: "Structure",
       description:
-        'The heading hierarchy jumps over one or more levels.',
+        "The heading hierarchy jumps over one or more levels.",
       recommendation:
-        'Use headings in a logical order without skipping levels.',
-      wcag: '1.3.1',
+        "Use headings in a logical order without skipping levels.",
+      wcag: "1.3.1",
       count: skippedHeadings,
     });
   }
 
-  /*
-   * 5. Missing page language
-   */
+  // 5. Missing page language
   const hasLangAttribute =
     /<html\b[^>]*\blang\s*=/i.test(html);
 
   if (!hasLangAttribute) {
     issues.push({
-      title: 'Page language is not declared',
-      severity: 'moderate',
-      category: 'Language',
+      title: "Page language is not declared",
+      severity: "moderate",
+      category: "Language",
       description:
-        'The html element does not declare the page language.',
+        "The html element does not declare the page language.",
       recommendation:
         'Set the lang attribute, for example <html lang="en">.',
-      wcag: '3.1.1',
+      wcag: "3.1.1",
       count: 1,
     });
   }
@@ -249,43 +239,47 @@ function inspectHtml(html: string): WebsiteIssue[] {
 async function analyzeWebsite(url: string) {
   if (!isSafeUrl(url)) {
     throw new Error(
-      'Enter a valid public HTTP or HTTPS URL.',
+      "Enter a valid public HTTP or HTTPS URL."
     );
   }
 
   const response = await fetch(url, {
     headers: {
-      'User-Agent':
-        'SAARTHI-AI-Accessibility-Checker/1.0',
+      "User-Agent":
+        "SAARTHI-AI-Accessibility-Checker/1.0",
     },
-    redirect: 'follow',
+    redirect: "follow",
     signal: AbortSignal.timeout(12000),
   });
 
   if (!response.ok) {
     throw new Error(
-      `The website returned HTTP ${response.status}.`,
+      `The website returned HTTP ${response.status}.`
     );
   }
 
   const contentType =
-    response.headers.get('content-type') ?? '';
+    response.headers.get("content-type") ?? "";
 
-  if (!contentType.toLowerCase().includes('text/html')) {
+  if (
+    !contentType
+      .toLowerCase()
+      .includes("text/html")
+  ) {
     throw new Error(
-      'The URL did not return an HTML page.',
+      "The URL did not return an HTML page."
     );
   }
 
   const html = (await response.text()).slice(
     0,
-    1_500_000,
+    1500000
   );
 
   const issues = inspectHtml(html);
 
   const severityPenalty: Record<
-    WebsiteIssue['severity'],
+    WebsiteIssue["severity"],
     number
   > = {
     critical: 12,
@@ -299,12 +293,12 @@ async function analyzeWebsite(url: string) {
       total +
       issue.count *
         severityPenalty[issue.severity],
-    0,
+    0
   );
 
   const score = Math.max(
     0,
-    Math.min(100, 100 - penalty),
+    Math.min(100, 100 - penalty)
   );
 
   return {
@@ -312,57 +306,74 @@ async function analyzeWebsite(url: string) {
     score,
     summary: issues.length
       ? `${issues.length} accessibility issue types were detected by the automated HTML check. Manual testing is still recommended.`
-      : 'No issues were detected by the automated HTML check. Manual testing is still recommended.',
+      : "No issues were detected by the automated HTML check. Manual testing is still recommended.",
     issues,
   };
 }
 
 async function askOpenAI(
-  messages: ChatMessage[],
+  messages: ChatMessage[]
 ): Promise<string> {
   if (!OPENAI_API_KEY) {
     throw new Error(
-      'AI service is not configured. Add AI_API_KEY in Supabase Edge Function Secrets.',
+      "AI service is not configured. Add AI_API_KEY in Supabase Edge Function Secrets."
     );
   }
 
-  const response = await fetch(OPENAI_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      messages,
-      max_tokens: 1000,
-      temperature: 0.5,
-    }),
-  });
+  const response = await fetch(
+    OPENAI_URL,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        messages,
+        max_tokens: 1000,
+        temperature: 0.5,
+      }),
+    }
+  );
 
-  let body: any;
+  let body: unknown;
 
   try {
     body = await response.json();
   } catch {
     throw new Error(
-      'The AI provider returned an invalid response.',
+      "The AI provider returned an invalid response."
     );
   }
 
   if (!response.ok) {
+    const errorBody = body as {
+      error?: {
+        message?: string;
+      };
+    };
+
     throw new Error(
-      body?.error?.message ||
-        'The AI provider returned an error.',
+      errorBody?.error?.message ||
+        "The AI provider returned an error."
     );
   }
 
+  const responseBody = body as {
+    choices?: Array<{
+      message?: {
+        content?: string;
+      };
+    }>;
+  };
+
   const reply =
-    body?.choices?.[0]?.message?.content?.trim();
+    responseBody.choices?.[0]?.message?.content?.trim();
 
   if (!reply) {
     throw new Error(
-      'The AI provider returned an empty response.',
+      "The AI provider returned an empty response."
     );
   }
 
@@ -370,111 +381,111 @@ async function askOpenAI(
 }
 
 function getMessages(
-  body: RequestBody,
+  body: RequestBody
 ): ChatMessage[] {
   const action = body.action;
+
   const text = cleanText(body.text);
+
   const documentContent = cleanText(
-    body.documentContent,
+    body.documentContent
   );
 
-  /*
-   * CHAT
-   */
-  if (action === 'chat') {
+  // CHAT
+  if (action === "chat") {
     const messages = Array.isArray(body.messages)
       ? body.messages.filter(
           (
-            message,
+            message
           ): message is ChatMessage =>
-            typeof message?.content === 'string' &&
-            ['user', 'assistant', 'system'].includes(
-              message.role,
-            ),
+            typeof message?.content === "string" &&
+            ["user", "assistant", "system"].includes(
+              message.role
+            )
         )
       : [];
 
     if (!messages.length) {
       throw new Error(
-        'Chat requires at least one message.',
+        "Chat requires at least one message."
       );
     }
 
     return [
       {
-        role: 'system',
+        role: "system",
         content: systemPrompt,
       },
       ...messages,
     ];
   }
 
-  /*
-   * SIMPLIFY TEXT
-   */
-  if (action === 'simplifyText') {
+  // SIMPLIFY TEXT
+  if (action === "simplifyText") {
     if (!text) {
-      throw new Error('Text is required.');
+      throw new Error("Text is required.");
     }
 
     return [
       {
-        role: 'system',
+        role: "system",
         content: `${systemPrompt}
 
-Simplify supplied text using short, clear sentences.
+Simplify the supplied text using short, clear sentences.
+
 Preserve its original meaning.
+
 Do not add unnecessary information.`,
       },
       {
-        role: 'user',
+        role: "user",
         content: text,
       },
     ];
   }
 
-  /*
-   * TRANSLATE TEXT
-   */
-  if (action === 'translateText') {
+  // TRANSLATE TEXT
+  if (action === "translateText") {
     if (!text) {
-      throw new Error('Text is required.');
+      throw new Error("Text is required.");
     }
 
     const language =
-      cleanText(body.targetLanguage) || 'Hindi';
+      cleanText(body.targetLanguage) ||
+      "Hindi";
 
     return [
       {
-        role: 'system',
+        role: "system",
         content: `${systemPrompt}
 
 Translate the supplied content to ${language}.
+
 Return only the translation.
+
 Do not add explanations.`,
       },
       {
-        role: 'user',
+        role: "user",
         content: text,
       },
     ];
   }
 
-  /*
-   * SUMMARIZE DOCUMENT
-   */
-  if (action === 'summarizeDocument') {
-    const content = documentContent || text;
+  // SUMMARIZE DOCUMENT
+  if (action === "summarizeDocument") {
+    const content =
+      documentContent || text;
 
     if (!content) {
       throw new Error(
-        'Document text is required.',
+        "Document text is required."
       );
     }
 
     return [
       {
-        role: 'system',
+        role: "system",
         content: `${systemPrompt}
 
 Summarize the supplied document.
@@ -489,33 +500,31 @@ Identify:
 Use clear headings and simple language.`,
       },
       {
-        role: 'user',
+        role: "user",
         content,
       },
     ];
   }
 
-  /*
-   * ANALYZE ACCESSIBILITY ISSUES
-   */
-  if (action === 'analyzeAccessibilityIssues') {
+  // ANALYZE ACCESSIBILITY ISSUES
+  if (action === "analyzeAccessibilityIssues") {
     const url = cleanText(body.url);
+
     const context = cleanText(body.context);
 
     return [
       {
-        role: 'system',
+        role: "system",
         content: `${systemPrompt}
 
 Explain accessibility issues using WCAG guidance.
 
-Do not claim that you visited a website unless HTML
-content was actually supplied.
+Do not claim that you visited a website unless HTML content was actually supplied.
 
 Give practical recommendations in simple language.`,
       },
       {
-        role: 'user',
+        role: "user",
         content: `URL: ${url}
 
 Context:
@@ -524,29 +533,25 @@ ${context}`,
     ];
   }
 
-  throw new Error('Invalid action.');
+  throw new Error("Invalid action.");
 }
-
-Deno.serve(async (request: Request) => {
-  /*
-   * CORS preflight
-   */
-  if (request.method === 'OPTIONS') {
+// @ts-ignore Supabase Edge Functions provide Deno.serve at runtime
+Deno.serve(async (request: Request): Promise<Response> => {
+  // CORS preflight
+  if (request.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
       headers: corsHeaders,
     });
   }
 
-  /*
-   * Only POST requests are allowed.
-   */
-  if (request.method !== 'POST') {
+  // Only POST requests are allowed
+  if (request.method !== "POST") {
     return json(
       {
-        error: 'Method not allowed.',
+        error: "Method not allowed.",
       },
-      405,
+      405
     );
   }
 
@@ -557,25 +562,23 @@ Deno.serve(async (request: Request) => {
     if (!body.action) {
       return json(
         {
-          error: 'Missing action.',
+          error: "Missing action.",
         },
-        400,
+        400
       );
     }
 
-    /*
-     * Website analysis does not require OpenAI.
-     */
-    if (body.action === 'analyzeWebsite') {
+    // Website analysis does not require OpenAI
+    if (body.action === "analyzeWebsite") {
       const url = cleanText(body.url);
 
       if (!url) {
         return json(
           {
             error:
-              'analyzeWebsite requires a URL.',
+              "analyzeWebsite requires a URL.",
           },
-          400,
+          400
         );
       }
 
@@ -588,9 +591,7 @@ Deno.serve(async (request: Request) => {
       });
     }
 
-    /*
-     * AI-powered actions
-     */
+    // AI-powered actions
     const messages = getMessages(body);
 
     const reply =
@@ -604,14 +605,16 @@ Deno.serve(async (request: Request) => {
     const message =
       error instanceof Error
         ? error.message
-        : 'An unexpected error occurred.';
+        : "An unexpected error occurred.";
 
     return json(
       {
         error: message,
-        configured: Boolean(OPENAI_API_KEY),
+        configured: Boolean(
+          OPENAI_API_KEY
+        ),
       },
-      500,
+      500
     );
   }
 });
