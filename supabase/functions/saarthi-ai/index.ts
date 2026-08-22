@@ -1,18 +1,17 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
-};
-
 interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
 }
 
+type Action =
+  | "chat"
+  | "simplifyText"
+  | "translateText"
+  | "analyzeAccessibilityIssues"
+  | "summarizeDocument";
+
 interface RequestBody {
-  action: "chat" | "simplifyText" | "translateText" | "analyzeAccessibilityIssues" | "summarizeDocument";
+  action?: Action;
   messages?: ChatMessage[];
   text?: string;
   targetLanguage?: string;
@@ -21,113 +20,696 @@ interface RequestBody {
   documentContent?: string;
 }
 
-const AI_API_KEY = Deno.env.get("AI_API_KEY");
+interface OpenAIResponse {
+  choices?: Array<{
+    message?: {
+      content?: string | null;
+    };
+  }>;
+  error?: {
+    message?: string;
+    type?: string;
+    code?: string;
+  };
+}
 
-const SAARTHI_SYSTEM_PROMPT = `You are SAARTHI AI, an accessibility-focused assistant for the SAARTHI AI platform — "The Internet Should Adapt to You."
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods":
+    "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "Content-Type, Authorization, X-Client-Info, Apikey",
+  "Content-Type": "application/json",
+};
+
+const AI_API_KEY =
+  Deno.env.get("AI_API_KEY");
+
+const OPENAI_API_URL =
+  "https://api.openai.com/v1/chat/completions";
+
+const OPENAI_MODEL =
+  "gpt-4o-mini";
+
+const SAARTHI_SYSTEM_PROMPT = `
+You are SAARTHI AI, an accessibility-focused assistant for the SAARTHI AI platform.
+
+Platform tagline:
+"The Internet Should Adapt to You."
 
 Your role is to help users with:
-- Understanding complex websites and their accessibility issues
-- Providing WCAG-based accessibility guidance and recommendations
-- Simplifying complex text into plain, easy-to-understand language
-- Explaining documents and extracting key information
-- Translation assistance across Indian languages (English, Hindi, Kannada, Tamil, Telugu, Marathi, Bengali, Malayalam)
-- Navigation help within the SAARTHI AI application
-- General accessibility best practices
 
-Keep responses concise, friendly, and actionable. When discussing accessibility, reference WCAG criteria where relevant. If a user asks about a specific page in the app, guide them to it.`;
+- Understanding complex websites
+- Understanding accessibility issues
+- Providing WCAG-based accessibility guidance
+- Simplifying complex text into plain language
+- Explaining documents
+- Extracting important information from documents
+- Translation between Indian languages
+- Navigation help inside the SAARTHI AI application
+- General digital accessibility guidance
 
-serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
+Supported Indian languages include:
+
+English
+Hindi
+Kannada
+Tamil
+Telugu
+Marathi
+Bengali
+Malayalam
+
+Keep responses:
+
+- Concise
+- Friendly
+- Clear
+- Practical
+- Actionable
+
+When discussing accessibility, reference WCAG criteria when appropriate.
+
+Do not invent facts about a website or document when the required information has not been provided.
+`;
+
+/* -------------------------------------------------------
+   JSON RESPONSE HELPER
+------------------------------------------------------- */
+
+function jsonResponse(
+  data: unknown,
+  status = 200,
+): Response {
+  return new Response(
+    JSON.stringify(data),
+    {
+      status,
+      headers: corsHeaders,
+    },
+  );
+}
+
+/* -------------------------------------------------------
+   STRING HELPER
+------------------------------------------------------- */
+
+function cleanText(
+  value: unknown,
+): string {
+  if (typeof value !== "string") {
+    return "";
   }
 
-  try {
-    if (!AI_API_KEY) {
-      return new Response(
-        JSON.stringify({
-          error: "AI_API_KEY is not configured. Please add an AI_API_KEY secret to your Supabase project to enable AI features.",
-          configured: false,
-        }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+  return value.trim();
+}
+
+/* -------------------------------------------------------
+   VALIDATE CHAT MESSAGES
+------------------------------------------------------- */
+
+function isValidChatMessage(
+  message: unknown,
+): message is ChatMessage {
+  if (
+    typeof message !== "object" ||
+    message === null
+  ) {
+    return false;
+  }
+
+  const item =
+    message as Record<string, unknown>;
+
+  return (
+    (item.role === "user" ||
+      item.role === "assistant" ||
+      item.role === "system") &&
+    typeof item.content === "string"
+  );
+}
+
+/* -------------------------------------------------------
+   BUILD REQUEST
+------------------------------------------------------- */
+
+function buildRequest(
+  body: RequestBody,
+): {
+  systemPrompt: string;
+  messages: ChatMessage[];
+} {
+  const action = body.action;
+
+  if (action === "chat") {
+    const messages =
+      Array.isArray(body.messages)
+        ? body.messages.filter(
+            isValidChatMessage,
+          )
+        : [];
+
+    return {
+      systemPrompt:
+        SAARTHI_SYSTEM_PROMPT,
+
+      messages: [
+        {
+          role: "system",
+          content:
+            SAARTHI_SYSTEM_PROMPT,
+        },
+        ...messages,
+      ],
+    };
+  }
+
+  switch (action) {
+    case "simplifyText": {
+      const text =
+        cleanText(body.text);
+
+      return {
+        systemPrompt: `
+${SAARTHI_SYSTEM_PROMPT}
+
+You are now in SIMPLIFY mode.
+
+Simplify the supplied text into plain,
+easy-to-understand language.
+
+Rules:
+- Keep the original meaning.
+- Use simple words.
+- Use short sentences.
+- Remove unnecessary complexity.
+- Do not add information that is not present.
+        `.trim(),
+
+        messages: [
+          {
+            role: "system",
+            content: `
+${SAARTHI_SYSTEM_PROMPT}
+
+Simplify mode is enabled.
+            `.trim(),
+          },
+          {
+            role: "user",
+            content:
+              `Simplify this text:\n\n${text}`,
+          },
+        ],
+      };
     }
 
-    const body: RequestBody = await req.json();
-    const { action } = body;
+    case "translateText": {
+      const text =
+        cleanText(body.text);
 
-    let systemPrompt = SAARTHI_SYSTEM_PROMPT;
-    let userContent = "";
+      const language =
+        cleanText(
+          body.targetLanguage,
+        ) || "Hindi";
 
-    switch (action) {
-      case "chat":
-        // messages-based conversation
-        break;
-      case "simplifyText":
-        systemPrompt = `${SAARTHI_SYSTEM_PROMPT}\n\nYou are now in SIMPLIFY mode. Simplify the following text into plain, easy-to-understand language. Keep the meaning but make it shorter and clearer. Use simple words.`;
-        userContent = `Simplify this text:\n\n${body.text || ""}`;
-        break;
-      case "translateText":
-        systemPrompt = `${SAARTHI_SYSTEM_PROMPT}\n\nYou are now in TRANSLATE mode. Translate the following text into ${body.targetLanguage || "Hindi"}. Keep the meaning accurate and natural.`;
-        userContent = `Translate this text to ${body.targetLanguage || "Hindi"}:\n\n${body.text || ""}`;
-        break;
-      case "analyzeAccessibilityIssues":
-        systemPrompt = `${SAARTHI_SYSTEM_PROMPT}\n\nYou are now in ACCESSIBILITY ANALYSIS mode. Analyze the described website or content for accessibility issues. Provide a list of issues with severity, WCAG criteria, and recommendations.`;
-        userContent = `Analyze this website for accessibility issues:\n\nURL: ${body.url || "N/A"}\n\nContext: ${body.context || "N/A"}`;
-        break;
-      case "summarizeDocument":
-        systemPrompt = `${SAARTHI_SYSTEM_PROMPT}\n\nYou are now in DOCUMENT ANALYSIS mode. Analyze the document and provide: a summary, important dates, eligibility criteria, required documents, important information, and next steps. Format as JSON.`;
-        userContent = `Analyze this document:\n\n${body.documentContent || body.text || ""}`;
-        break;
-      default:
-        return new Response(
-          JSON.stringify({ error: "Invalid action. Use: chat, simplifyText, translateText, analyzeAccessibilityIssues, or summarizeDocument." }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      return {
+        systemPrompt: `
+${SAARTHI_SYSTEM_PROMPT}
+
+You are now in TRANSLATE mode.
+
+Translate the supplied text into
+${language}.
+
+Rules:
+- Preserve the original meaning.
+- Use natural language.
+- Do not add explanations unless requested.
+        `.trim(),
+
+        messages: [
+          {
+            role: "system",
+            content: `
+${SAARTHI_SYSTEM_PROMPT}
+
+Translation mode is enabled.
+Target language: ${language}
+            `.trim(),
+          },
+          {
+            role: "user",
+            content:
+              `Translate this text to ${language}:\n\n${text}`,
+          },
+        ],
+      };
+    }
+
+    case "analyzeAccessibilityIssues": {
+      const url =
+        cleanText(body.url) ||
+        "N/A";
+
+      const context =
+        cleanText(body.context) ||
+        "N/A";
+
+      return {
+        systemPrompt: `
+${SAARTHI_SYSTEM_PROMPT}
+
+You are now in ACCESSIBILITY ANALYSIS mode.
+
+Analyze only the information supplied to you.
+
+For every accessibility issue, provide:
+
+1. Issue title
+2. Severity
+3. WCAG criterion
+4. Explanation
+5. Recommended fix
+
+Do not claim that you actually visited or scanned a URL
+unless website content has been supplied to you.
+        `.trim(),
+
+        messages: [
+          {
+            role: "system",
+            content:
+              SAARTHI_SYSTEM_PROMPT,
+          },
+          {
+            role: "user",
+            content:
+              `Analyze this website for accessibility issues.
+
+URL:
+${url}
+
+Available context:
+${context}`,
+          },
+        ],
+      };
+    }
+
+    case "summarizeDocument": {
+      const documentContent =
+        cleanText(
+          body.documentContent ||
+            body.text,
         );
+
+      return {
+        systemPrompt: `
+${SAARTHI_SYSTEM_PROMPT}
+
+You are now in DOCUMENT ANALYSIS mode.
+
+Analyze the supplied document.
+
+Return a concise JSON object with:
+
+{
+  "summary": "...",
+  "importantDates": [],
+  "eligibilityCriteria": [],
+  "requiredDocuments": [],
+  "importantInformation": [],
+  "nextSteps": []
+}
+
+Return valid JSON only.
+        `.trim(),
+
+        messages: [
+          {
+            role: "system",
+            content: `
+${SAARTHI_SYSTEM_PROMPT}
+
+Document analysis mode is enabled.
+Return valid JSON only.
+            `.trim(),
+          },
+          {
+            role: "user",
+            content:
+              `Analyze this document:\n\n${documentContent}`,
+          },
+        ],
+      };
     }
 
-    // Build messages for OpenAI-compatible API
-    let apiMessages: ChatMessage[];
-    if (action === "chat" && body.messages) {
-      apiMessages = [{ role: "system", content: systemPrompt }, ...body.messages];
-    } else {
-      apiMessages = [{ role: "system", content: systemPrompt }, { role: "user", content: userContent }];
-    }
+    default:
+      throw new Error(
+        "Invalid or missing action.",
+      );
+  }
+}
 
-    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${AI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: apiMessages,
-        max_tokens: 800,
-        temperature: 0.7,
-      }),
-    });
+/* -------------------------------------------------------
+   MAIN EDGE FUNCTION
+------------------------------------------------------- */
 
-    if (!openaiResponse.ok) {
-      const errText = await openaiResponse.text();
-      console.error("AI API error:", openaiResponse.status, errText);
+Deno.serve(
+  async (req: Request) => {
+    /* -----------------------------------------------
+       CORS
+    ------------------------------------------------ */
+
+    if (
+      req.method === "OPTIONS"
+    ) {
       return new Response(
-        JSON.stringify({ error: `AI service returned an error (${openaiResponse.status}). Please try again.` }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        null,
+        {
+          status: 204,
+          headers: corsHeaders,
+        },
       );
     }
 
-    const aiData = await openaiResponse.json();
-    const reply = aiData.choices?.[0]?.message?.content || "I couldn't generate a response. Please try again.";
+    /* -----------------------------------------------
+       Only POST is supported
+    ------------------------------------------------ */
 
-    return new Response(
-      JSON.stringify({ reply, configured: true }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (err) {
-    console.error("Edge function error:", err);
-    return new Response(
-      JSON.stringify({ error: "An unexpected error occurred. Please try again." }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  }
-});
+    if (
+      req.method !== "POST"
+    ) {
+      return jsonResponse(
+        {
+          error:
+            "Method not allowed. Use POST.",
+        },
+        405,
+      );
+    }
+
+    try {
+      /* ---------------------------------------------
+         Check API key
+      --------------------------------------------- */
+
+      if (!AI_API_KEY) {
+        console.error(
+          "AI_API_KEY is not configured.",
+        );
+
+        return jsonResponse(
+          {
+            error:
+              "AI service is not configured. Add AI_API_KEY to your Supabase Edge Function secrets.",
+            configured: false,
+          },
+          503,
+        );
+      }
+
+      /* ---------------------------------------------
+         Parse JSON
+      --------------------------------------------- */
+
+      let body: RequestBody;
+
+      try {
+        body =
+          (await req.json()) as RequestBody;
+      } catch {
+        return jsonResponse(
+          {
+            error:
+              "Invalid JSON request body.",
+          },
+          400,
+        );
+      }
+
+      /* ---------------------------------------------
+         Validate action
+      --------------------------------------------- */
+
+      if (!body.action) {
+        return jsonResponse(
+          {
+            error:
+              "Missing action.",
+            allowedActions: [
+              "chat",
+              "simplifyText",
+              "translateText",
+              "analyzeAccessibilityIssues",
+              "summarizeDocument",
+            ],
+          },
+          400,
+        );
+      }
+
+      /* ---------------------------------------------
+         Validate chat
+      --------------------------------------------- */
+
+      if (
+        body.action === "chat" &&
+        (!Array.isArray(
+          body.messages,
+        ) ||
+          body.messages.length === 0)
+      ) {
+        return jsonResponse(
+          {
+            error:
+              "Chat action requires a non-empty messages array.",
+          },
+          400,
+        );
+      }
+
+      /* ---------------------------------------------
+         Validate text-based actions
+      --------------------------------------------- */
+
+      if (
+        body.action ===
+          "simplifyText" &&
+        !cleanText(body.text)
+      ) {
+        return jsonResponse(
+          {
+            error:
+              "simplifyText requires a text value.",
+          },
+          400,
+        );
+      }
+
+      if (
+        body.action ===
+          "translateText" &&
+        !cleanText(body.text)
+      ) {
+        return jsonResponse(
+          {
+            error:
+              "translateText requires a text value.",
+          },
+          400,
+        );
+      }
+
+      if (
+        body.action ===
+          "summarizeDocument" &&
+        !cleanText(
+          body.documentContent ||
+            body.text,
+        )
+      ) {
+        return jsonResponse(
+          {
+            error:
+              "summarizeDocument requires documentContent or text.",
+          },
+          400,
+        );
+      }
+
+      /* ---------------------------------------------
+         Build AI messages
+      --------------------------------------------- */
+
+      const {
+        messages,
+      } = buildRequest(body);
+
+      /* ---------------------------------------------
+         Check message size
+      --------------------------------------------- */
+
+      const totalCharacters =
+        messages.reduce(
+          (
+            total,
+            message,
+          ) =>
+            total +
+            message.content.length,
+          0,
+        );
+
+      if (
+        totalCharacters >
+        100000
+      ) {
+        return jsonResponse(
+          {
+            error:
+              "Request is too large. Please shorten the supplied text or document.",
+          },
+          413,
+        );
+      }
+
+      /* ---------------------------------------------
+         OpenAI request
+      --------------------------------------------- */
+
+      const openaiResponse =
+        await fetch(
+          OPENAI_API_URL,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              Authorization:
+                `Bearer ${AI_API_KEY}`,
+            },
+
+            body: JSON.stringify({
+              model:
+                OPENAI_MODEL,
+
+              messages,
+
+              max_tokens: 1000,
+
+              temperature: 0.7,
+            }),
+          },
+        );
+
+      /* ---------------------------------------------
+         Handle OpenAI error
+      --------------------------------------------- */
+
+      if (
+        !openaiResponse.ok
+      ) {
+        const errorText =
+          await openaiResponse.text();
+
+        console.error(
+          "OpenAI API error:",
+          openaiResponse.status,
+          errorText,
+        );
+
+        let errorMessage =
+          "The AI service returned an error.";
+
+        try {
+          const errorData =
+            JSON.parse(
+              errorText,
+            ) as {
+              error?: {
+                message?: string;
+              };
+            };
+
+          if (
+            errorData.error?.message
+          ) {
+            errorMessage =
+              errorData.error.message;
+          }
+        } catch {
+          // Ignore invalid JSON from provider.
+        }
+
+        return jsonResponse(
+          {
+            error:
+              errorMessage,
+            configured: true,
+          },
+          502,
+        );
+      }
+
+      /* ---------------------------------------------
+         Parse OpenAI response
+      --------------------------------------------- */
+
+      const aiData =
+        (await openaiResponse.json()) as OpenAIResponse;
+
+      const reply =
+        aiData.choices?.[0]
+          ?.message?.content
+          ?.trim();
+
+      if (!reply) {
+        console.error(
+          "OpenAI returned no message:",
+          aiData,
+        );
+
+        return jsonResponse(
+          {
+            error:
+              "The AI service returned an empty response.",
+            configured: true,
+          },
+          502,
+        );
+      }
+
+      /* ---------------------------------------------
+         Success
+      --------------------------------------------- */
+
+      return jsonResponse(
+        {
+          reply,
+          configured: true,
+          action: body.action,
+        },
+        200,
+      );
+    } catch (error) {
+      console.error(
+        "SAARTHI Edge Function error:",
+        error,
+      );
+
+      return jsonResponse(
+        {
+          error:
+            "An unexpected server error occurred. Please try again.",
+          configured:
+            Boolean(AI_API_KEY),
+        },
+        500,
+      );
+    }
+  },
+);

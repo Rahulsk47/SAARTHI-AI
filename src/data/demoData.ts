@@ -302,3 +302,107 @@ export const simplifyDemoText = async (
   
 This content has been processed by SAARTHI AI Demo Mode to demonstrate how complex information can be presented in a clearer and easier-to-understand format.`;
 };
+// Demo website analysis report
+export const DEMO_REPORT = {
+  id: 'demo-report-001',
+  url: 'https://example.com',
+  title: 'Example Website Accessibility Report',
+  score: 82,
+  summary:
+    'The website has good overall accessibility but still contains some issues that should be fixed.',
+  issues: [
+    {
+      id: 'issue-1',
+      type: 'error',
+      title: 'Missing image alt text',
+      description:
+        'Some images do not have alternative text for screen reader users.',
+    },
+    {
+      id: 'issue-2',
+      type: 'warning',
+      title: 'Low color contrast',
+      description:
+        'Some text does not have sufficient contrast against its background.',
+    },
+    {
+      id: 'issue-3',
+      type: 'info',
+      title: 'Heading structure',
+      description:
+        'Review the heading hierarchy to ensure it follows a logical order.',
+    },
+  ],
+  createdAt: new Date().toISOString(),
+};
+
+// Demo analysis history
+export const DEMO_HISTORY = [
+  {
+    id: 'history-1',
+    url: 'https://example.com',
+    title: 'Example Website',
+    score: 82,
+    date: '2026-08-20',
+  },
+  {
+    id: 'history-2',
+    url: 'https://demo-site.com',
+    title: 'Demo Website',
+    score: 76,
+    date: '2026-08-19',
+  },
+  {
+    id: 'history-3',
+    url: 'https://sample.org',
+    title: 'Sample Organization',
+    score: 91,
+    date: '2026-08-18',
+  },
+];
+
+// Demo document for Document AI
+export const DEMO_DOCUMENT = {
+  id: 'demo-document-001',
+  name: 'Sample Accessibility Document.pdf',
+  type: 'application/pdf',
+  size: 245760,
+  uploadedAt: new Date().toISOString(),
+  status: 'completed',
+  content:
+    'This is a sample document used to demonstrate document accessibility analysis.',
+  issues: [
+    {
+      id: 'doc-issue-1',
+      type: 'warning',
+      message: 'Some headings may not follow a proper hierarchy.',
+    },
+    {
+      id: 'doc-issue-2',
+      type: 'error',
+      message: 'Some images may be missing alternative text.',
+    },
+  ],
+};
+
+// Language translations
+export const TRANSLATIONS = {
+  en: {
+    welcome: 'Welcome',
+    analyze: 'Analyze',
+    dashboard: 'Dashboard',
+    settings: 'Settings',
+  },
+  hi: {
+    welcome: 'स्वागत है',
+    analyze: 'विश्लेषण करें',
+    dashboard: 'डैशबोर्ड',
+    settings: 'सेटिंग्स',
+  },
+  kn: {
+    welcome: 'ಸ್ವಾಗತ',
+    analyze: 'ವಿಶ್ಲೇಷಿಸಿ',
+    dashboard: 'ಡ್ಯಾಶ್‌ಬೋರ್ಡ್',
+    settings: 'ಸೆಟ್ಟಿಂಗ್‌ಗಳು',
+  },
+};
