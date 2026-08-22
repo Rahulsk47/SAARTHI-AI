@@ -6,7 +6,7 @@ import SaarthiCore from '@/components/SaarthiCore';
 import { useAuth } from '@/context/AuthContext';
 
 export default function Auth() {
-  const { session, loading, signUp, signIn } = useAuth();
+  const { session, loading, signUp, signIn, continueAsGuest } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
@@ -159,6 +159,24 @@ export default function Auth() {
                   ) : (
                     <>{mode === 'login' ? 'Sign In' : 'Create Account'} <ArrowRight size={16} /></>
                   )}
+                </button>
+
+                <div className="relative my-4 flex items-center justify-center">
+                  <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10" /></div>
+                  <span className="relative bg-ink-900 px-3 text-xs uppercase text-slate-500">Or</span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    continueAsGuest();
+                    navigate('/dashboard');
+                  }}
+                  className="btn-secondary w-full justify-center text-sm"
+                  id="guest-login-button"
+                >
+                  <Sparkles size={16} className="text-core-400" />
+                  Instant Guest Access (No Signup)
                 </button>
               </form>
 

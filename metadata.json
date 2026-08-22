@@ -1,0 +1,6 @@
+{
+  "name": "SAARTHI AI - Accessibility Platform",
+  "description": "Comprehensive AI accessibility assistant providing website audits, document simplification, multilingual translation, voice control, and accessible page transformation.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

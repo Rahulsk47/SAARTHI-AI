@@ -10,13 +10,20 @@ import {
   Languages,
   RotateCcw,
   Eye,
+  Sparkles,
 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import SectionCard from '@/components/SectionCard';
-import { useA11y, LANGUAGES } from '@/context/AccessibilityContext';
+import { useA11y, LANGUAGES, type A11ySettings } from '@/context/AccessibilityContext';
 
 export default function AccessibilitySettings() {
   const { settings, update, reset } = useA11y();
+
+  const applyPreset = (preset: Partial<A11ySettings>) => {
+    Object.entries(preset).forEach(([key, val]) => {
+      update(key as keyof A11ySettings, val as any);
+    });
+  };
 
   return (
     <div className="px-6 py-8 md:px-10">
@@ -30,6 +37,82 @@ export default function AccessibilitySettings() {
           </button>
         }
       />
+
+      {/* Quick Profile Presets */}
+      <div className="mb-8 rounded-2xl border border-white/10 bg-ink-900/40 p-5">
+        <div className="flex items-center gap-2 text-sm font-semibold text-white mb-3">
+          <Sparkles size={16} className="text-core-400" />
+          <span>Instant Accessibility Presets</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <button
+            onClick={() =>
+              applyPreset({
+                fontScale: 1,
+                letterSpacing: 0,
+                wordSpacing: 0,
+                lineHeight: 1.5,
+                highContrast: false,
+                simpleLanguage: false,
+                largeControls: false,
+                reduceMotion: false,
+              })
+            }
+            className="rounded-xl border border-white/10 bg-ink-950 p-3 text-left hover:border-core-400/40 transition"
+          >
+            <div className="text-xs font-semibold text-white">Default Balanced</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">Standard clean interface</div>
+          </button>
+
+          <button
+            onClick={() =>
+              applyPreset({
+                fontScale: 1.25,
+                highContrast: true,
+                largeControls: true,
+                letterSpacing: 0.04,
+                lineHeight: 1.7,
+              })
+            }
+            className="rounded-xl border border-yellow-400/40 bg-yellow-400/5 p-3 text-left hover:border-yellow-400 transition"
+          >
+            <div className="text-xs font-semibold text-yellow-300">High Contrast & Focus</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">Max text-bg visibility</div>
+          </button>
+
+          <button
+            onClick={() =>
+              applyPreset({
+                fontScale: 1.15,
+                letterSpacing: 0.06,
+                wordSpacing: 0.15,
+                lineHeight: 1.8,
+                simpleLanguage: true,
+              })
+            }
+            className="rounded-xl border border-core-400/40 bg-core-500/10 p-3 text-left hover:border-core-300 transition"
+          >
+            <div className="text-xs font-semibold text-core-200">Dyslexia & Readability</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">Expanded word tracking</div>
+          </button>
+
+          <button
+            onClick={() =>
+              applyPreset({
+                fontScale: 1.3,
+                largeControls: true,
+                simpleLanguage: true,
+                reduceMotion: true,
+                lineHeight: 1.7,
+              })
+            }
+            className="rounded-xl border border-success-500/40 bg-success-500/10 p-3 text-left hover:border-success-400 transition"
+          >
+            <div className="text-xs font-semibold text-success-300">Senior Citizen / Motor</div>
+            <div className="text-[11px] text-slate-400 mt-0.5">Large touch targets & simple words</div>
+          </button>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Font Size */}

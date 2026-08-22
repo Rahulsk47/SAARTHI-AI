@@ -4,16 +4,7 @@ import { motion } from 'framer-motion';
 import { History as HistoryIcon, Globe, FileText, Mic, Languages, Filter, ArrowRight, Loader2 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import SectionCard from '@/components/SectionCard';
-import { supabase } from '@/lib/supabase';
-
-interface ActivityRow {
-  id: string;
-  type: string;
-  title: string;
-  detail: string;
-  score: number | null;
-  created_at: string;
-}
+import { getRecentActivity, type ActivityLog } from '@/lib/data';
 
 type FilterType = 'all' | 'website' | 'document' | 'voice' | 'translation';
 
@@ -26,7 +17,7 @@ const TYPE_META: Record<string, { icon: typeof Globe; label: string; color: stri
 
 export default function History() {
   const [filter, setFilter] = useState<FilterType>('all');
-  const [items, setItems] = useState<ActivityRow[]>([]);
+  const [items, setItems] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,25 +26,21 @@ export default function History() {
 
   const loadHistory = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('activity_logs')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50);
-
-    if (error) {
+    try {
+      const data = await getRecentActivity(60);
+      setItems(data);
+    } catch (error) {
       console.error('Failed to load history:', error);
-    } else if (data) {
-      setItems(data as ActivityRow[]);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const filtered = filter === 'all' ? items : items.filter((h) => h.type === filter);
 
   return (
     <div className="px-6 py-8 md:px-10">
-      <PageHeader title="History" subtitle="All your SAARTHI AI activities." icon={HistoryIcon} />
+      <PageHeader title="Activity History" subtitle="Your saved audit logs, voice sessions, and document analyses." icon={HistoryIcon} />
 
       {/* Filters */}
       <div className="mb-6 flex flex-wrap items-center gap-2">
@@ -90,11 +77,11 @@ export default function History() {
                   key={item.id}
                   initial={{ opacity: 0, x: -16 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: i * 0.05 }}
+                  transition={{ delay: i * 0.04 }}
                 >
                   <Link
                     to={item.type === 'website' ? '/results' : item.type === 'document' ? '/document-ai' : item.type === 'voice' ? '/voice' : '/language'}
-                    className="group flex items-center gap-4 card hover:border-core-400/30 hover:bg-ink-700/60 transition-all"
+                    className="group flex items-center gap-4 card hover:border-core-400/30 hover:bg-ink-700/60 transition-all p-4"
                   >
                     <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/5 border border-white/10 ${meta.color}`}>
                       <Icon size={20} />
@@ -104,8 +91,8 @@ export default function History() {
                         <span className="text-sm font-medium text-white truncate">{item.title}</span>
                         <span className="chip border border-white/10 text-slate-500">{meta.label}</span>
                       </div>
-                      <div className="text-xs text-slate-500 mt-0.5">{item.detail}</div>
-                      <div className="text-[10px] text-slate-600 mt-0.5">
+                      <div className="text-xs text-slate-400 mt-0.5">{item.detail}</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">
                         {new Date(item.created_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
                       </div>
                     </div>
@@ -127,7 +114,7 @@ export default function History() {
             <SectionCard delay={0}>
               <p className="text-center text-slate-500 py-8">
                 {items.length === 0
-                  ? 'No activities yet. Start by analyzing a website or uploading a document.'
+                  ? 'No activities yet. Start by auditing a website, uploading a document, or speaking with SAARTHI AI.'
                   : 'No activities found for this filter.'}
               </p>
             </SectionCard>

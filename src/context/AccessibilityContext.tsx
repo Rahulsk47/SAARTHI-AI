@@ -186,3 +186,5 @@ export function useA11y() {
   if (!ctx) throw new Error('useA11y must be used within A11yProvider');
   return ctx;
 }
+
+export const useAccessibility = useA11y;

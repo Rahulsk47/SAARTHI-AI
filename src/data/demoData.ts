@@ -1,391 +1,260 @@
 // =====================================================
-// SAARTHI AI - DEMO DATA & MOCK SERVICES
-// Initial GitHub Demo Version
+// SAARTHI AI - DEMO DATA & REPOSITORY DEFAULTS
 // =====================================================
 
 export type AIState =
-  | "idle"
-  | "listening"
-  | "thinking"
-  | "analyzing"
-  | "processing"
-  | "transforming"
-  | "success"
-  | "error";
+  | 'idle'
+  | 'listening'
+  | 'thinking'
+  | 'analyzing'
+  | 'processing'
+  | 'transforming'
+  | 'success'
+  | 'error';
 
 export interface ChatMessage {
   id: string;
-  role: "user" | "assistant";
+  role: 'user' | 'assistant';
   content: string;
   createdAt: string;
 }
 
 export interface WebsiteIssue {
   id: string;
+  analysis_id?: string;
   title: string;
-  severity: "Critical" | "Warning" | "Info";
+  severity: 'Critical' | 'Warning' | 'Info' | string;
   category: string;
   description: string;
   recommendation: string;
+  wcag?: string;
+  count?: number;
 }
 
 export interface WebsiteAnalysis {
   id: string;
   url: string;
   score: number;
-  status: string;
-  createdAt: string;
+  status?: string;
+  summary?: string;
+  createdAt?: string;
+  created_at?: string;
   issues: WebsiteIssue[];
+  breakdown?: {
+    perceivable: number;
+    operable: number;
+    understandable: number;
+    robust: number;
+  };
 }
 
-// =====================================================
-// DEMO USER
-// =====================================================
-
 export const demoUser = {
-  id: "demo-user-001",
-  name: "Demo User",
-  email: "demo@saarthi.ai",
-  preferredLanguage: "English",
+  id: 'demo-user-001',
+  name: 'Citizen User',
+  email: 'user@saarthi.ai',
+  preferredLanguage: 'English',
 };
 
-// =====================================================
-// DEMO ACCESSIBILITY SETTINGS
-// =====================================================
-
 export const defaultAccessibilitySettings = {
-  fontSize: "medium",
+  fontSize: 'medium',
   highContrast: false,
   textSpacing: false,
   simpleLanguage: false,
   largeControls: false,
   reduceMotion: false,
-  preferredLanguage: "English",
+  preferredLanguage: 'English',
 };
 
-// =====================================================
-// DEMO WEBSITE ANALYSIS
-// =====================================================
-
-export const demoWebsiteAnalysis: WebsiteAnalysis = {
-  id: "analysis-demo-001",
-  url: "https://example.com",
-  score: 78,
-  status: "completed",
-  createdAt: new Date().toISOString(),
-
-  issues: [
-    {
-      id: "issue-1",
-      title: "Images missing alternative text",
-      severity: "Critical",
-      category: "Visual",
-      description:
-        "Some images do not contain meaningful alternative text for screen readers.",
-      recommendation:
-        "Add descriptive alt text to all important images.",
-    },
-    {
-      id: "issue-2",
-      title: "Low color contrast",
-      severity: "Warning",
-      category: "Visual",
-      description:
-        "Some text does not have enough contrast against its background.",
-      recommendation:
-        "Increase contrast to meet WCAG accessibility guidelines.",
-    },
-    {
-      id: "issue-3",
-      title: "Keyboard navigation issue",
-      severity: "Warning",
-      category: "Navigation",
-      description:
-        "Some interactive elements cannot be reached using only a keyboard.",
-      recommendation:
-        "Ensure all interactive elements are keyboard accessible.",
-    },
-    {
-      id: "issue-4",
-      title: "Complex language detected",
-      severity: "Info",
-      category: "Content",
-      description:
-        "Some content may be difficult for users with cognitive or language barriers.",
-      recommendation:
-        "Provide a simplified language version.",
-    },
-  ],
-};
-
-// =====================================================
-// DEMO HISTORY
-// =====================================================
-
-export const demoHistory = [
+export const DEMO_ISSUES: WebsiteIssue[] = [
   {
-    id: "history-1",
-    type: "Website Analysis",
-    title: "example.com",
-    date: "Today",
-    status: "Completed",
+    id: 'issue-1',
+    analysis_id: 'analysis-demo-001',
+    title: 'Images missing alternative text (alt="")',
+    severity: 'Critical',
+    category: 'Visual & Screen Readers',
+    description: '42 images lack descriptive alt text, preventing screen reader users from understanding image contents.',
+    recommendation: 'Add meaningful alt attributes to all content images or alt="" for purely decorative elements.',
+    wcag: 'WCAG 1.1.1 Non-text Content (Level A)',
+    count: 42,
   },
   {
-    id: "history-2",
-    type: "Document AI",
-    title: "Government Scheme.pdf",
-    date: "Yesterday",
-    status: "Completed",
+    id: 'issue-2',
+    analysis_id: 'analysis-demo-001',
+    title: 'Low text color contrast ratio',
+    severity: 'Serious',
+    category: 'Visual & Color',
+    description: 'Subheadings and navigation text have a contrast ratio of 2.8:1, failing the 4.5:1 minimum standard.',
+    recommendation: 'Darken text color or adjust background palette to achieve at least 4.5:1 for normal text.',
+    wcag: 'WCAG 1.4.3 Contrast (Minimum) (Level AA)',
+    count: 14,
   },
   {
-    id: "history-3",
-    type: "Language",
-    title: "English → Hindi",
-    date: "2 days ago",
-    status: "Completed",
+    id: 'issue-3',
+    analysis_id: 'analysis-demo-001',
+    title: 'Missing keyboard focus indicators',
+    severity: 'Serious',
+    category: 'Keyboard & Navigation',
+    description: 'Interactive buttons and form fields remove outline:none without custom visible focus rings.',
+    recommendation: 'Provide high-contrast visible :focus and :focus-visible outlines on all interactive elements.',
+    wcag: 'WCAG 2.4.7 Focus Visible (Level AA)',
+    count: 8,
   },
   {
-    id: "history-4",
-    type: "Voice Session",
-    title: "SAARTHI Voice Assistant",
-    date: "3 days ago",
-    status: "Completed",
+    id: 'issue-4',
+    analysis_id: 'analysis-demo-001',
+    title: 'Form fields missing accessible <label> tags',
+    severity: 'Critical',
+    category: 'Forms & Inputs',
+    description: 'Search inputs and application dropdowns lack explicit <label for="..."> or aria-label attributes.',
+    recommendation: 'Pair every input element with a dedicated label or descriptive aria-label.',
+    wcag: 'WCAG 3.3.2 Labels or Instructions (Level A)',
+    count: 9,
   },
 ];
 
-// =====================================================
-// DEMO REPORT DATA
-// =====================================================
+export const DEMO_ANALYSES: WebsiteAnalysis[] = [
+  {
+    id: 'analysis-demo-001',
+    url: 'https://www.india.gov.in',
+    score: 78,
+    status: 'completed',
+    summary: 'The National Portal of India exhibits good semantic foundation but contains contrast and alt-text gaps on dynamic banner widgets.',
+    created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+    issues: DEMO_ISSUES,
+    breakdown: {
+      perceivable: 72,
+      operable: 84,
+      understandable: 80,
+      robust: 76,
+    },
+  },
+  {
+    id: 'analysis-demo-002',
+    url: 'https://uidai.gov.in',
+    score: 86,
+    status: 'completed',
+    summary: 'Strong keyboard accessibility and bilingual support. Minor heading hierarchy issues detected on inner service pages.',
+    created_at: new Date(Date.now() - 86400000).toISOString(),
+    issues: DEMO_ISSUES.slice(1),
+    breakdown: {
+      perceivable: 88,
+      operable: 90,
+      understandable: 82,
+      robust: 84,
+    },
+  },
+];
+
+export const demoWebsiteAnalysis = DEMO_ANALYSES[0];
+
+export const DEMO_ACTIVITY = [
+  {
+    id: 'act-1',
+    type: 'website',
+    title: 'Audited https://www.india.gov.in',
+    detail: 'WCAG 2.1 AA audit · Score 78/100 · 4 barrier categories detected',
+    score: 78,
+    created_at: new Date(Date.now() - 3600000 * 2).toISOString(),
+  },
+  {
+    id: 'act-2',
+    type: 'document',
+    title: 'Analyzed National Merit Scholarship.pdf',
+    detail: 'Extracted eligibility, application deadlines, and required documents',
+    score: null,
+    created_at: new Date(Date.now() - 3600000 * 8).toISOString(),
+  },
+  {
+    id: 'act-3',
+    type: 'translation',
+    title: 'Translated Welfare Guide to Hindi & Kannada',
+    detail: 'Simplified legal terminology and converted into plain regional language',
+    score: null,
+    created_at: new Date(Date.now() - 86400000).toISOString(),
+  },
+  {
+    id: 'act-4',
+    type: 'voice',
+    title: 'Voice Assistant Session',
+    detail: 'Inquired about UDID disability certificate requirements',
+    score: null,
+    created_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+  },
+];
+
+export const demoHistory = DEMO_ACTIVITY;
+export const DEMO_HISTORY = DEMO_ACTIVITY;
+
+export const DEMO_METRICS = {
+  analyses: 12,
+  documents: 8,
+  translations: 19,
+  averageScore: 78,
+};
 
 export const demoReports = {
   websitesAnalyzed: 12,
-  averageScore: 76,
+  averageScore: 78,
   criticalIssues: 8,
   warnings: 24,
   recommendations: 31,
 };
 
-// =====================================================
-// DEMO DOCUMENT
-// =====================================================
+export const DEMO_DOCUMENT = {
+  id: 'doc-demo-001',
+  fileName: 'National Merit Scholarship Guidelines 2026.pdf',
+  summary:
+    'The National Merit Scholarship provides full tuition assistance and a monthly stipend of ₹2,500 to meritorious students from economically weaker sections enrolled in recognized universities across India.',
+  importantDates: [
+    { event: 'Online Application Portal Opens', date: 'September 1, 2026' },
+    { event: 'Application Submission Deadline', date: 'October 31, 2026' },
+    { event: 'Institutional Verification Cutoff', date: 'November 15, 2026' },
+    { event: 'DBT Direct Benefit Transfer Disbursement', date: 'December 10, 2026' },
+  ],
+  eligibility: [
+    'Indian citizen enrolled in a full-time undergraduate or postgraduate degree program',
+    'Minimum 75% marks or equivalent CGPA in Class XII board examination',
+    'Total annual family income must not exceed ₹3,50,000 per annum',
+  ],
+  requiredDocuments: [
+    'Class 10th and 12th passing mark sheets and certificates',
+    'Valid Aadhaar Card linked to active bank account',
+    'Income Certificate issued by authorized Tehsildar or Revenue Officer',
+    'Bonafide student certificate issued by Head of Institution',
+    'Proof of residence (Electricity bill, Domicile certificate, or Ration Card)',
+  ],
+  importantInfo: [
+    'Incomplete applications without verifiable income certificates will be rejected automatically',
+    'Disbursal will be processed strictly via Aadhaar Enabled Payment System (AEPS)',
+    'Scholarship is renewable annually subject to maintaining at least 60% aggregate marks',
+  ],
+  nextSteps: [
+    'Verify eligibility and register with student Aadhaar number on the National Scholarship Portal',
+    'Upload self-attested copies of income and academic mark sheets',
+    'Submit application before October 31, 2026 and retain acknowledgment receipt for tracking',
+  ],
+};
 
 export const demoDocument = {
-  name: "Government Assistance Scheme.pdf",
-
-  summary:
-    "This document explains a government assistance program designed to provide financial support to eligible citizens.",
-
-  importantDates: [
-    "Application opens: January 10",
-    "Application deadline: March 31",
-  ],
-
-  eligibility: [
-    "Must be an Indian citizen",
-    "Must meet income requirements",
-    "Must provide valid identification",
-  ],
-
-  requiredDocuments: [
-    "Government ID",
-    "Address proof",
-    "Income certificate",
-    "Bank account details",
-  ],
-
-  importantInformation: [
-    "Applications are submitted online.",
-    "Verification may take several working days.",
-    "Incomplete applications may be rejected.",
-  ],
-
-  nextSteps: [
-    "Check your eligibility.",
-    "Prepare required documents.",
-    "Complete the online application.",
-    "Submit before the deadline.",
-  ],
+  name: DEMO_DOCUMENT.fileName,
+  summary: DEMO_DOCUMENT.summary,
+  importantDates: DEMO_DOCUMENT.importantDates.map((d) => `${d.event}: ${d.date}`),
+  eligibility: DEMO_DOCUMENT.eligibility,
+  requiredDocuments: DEMO_DOCUMENT.requiredDocuments,
+  importantInformation: DEMO_DOCUMENT.importantInfo,
+  nextSteps: DEMO_DOCUMENT.nextSteps,
 };
 
-// =====================================================
-// DEMO AI CHATBOT
-// =====================================================
-
-export const getDemoAIResponse = async (
-  message: string
-): Promise<string> => {
-  await new Promise((resolve) => setTimeout(resolve, 1200));
-
-  const text = message.toLowerCase();
-
-  if (text.includes("website") || text.includes("analyze")) {
-    return `I can help analyze a website for accessibility issues. You can use the Website Analyzer to check visual accessibility, keyboard navigation, forms, content clarity, and language accessibility.`;
-  }
-
-  if (text.includes("document") || text.includes("pdf")) {
-    return `I can help you understand your document. SAARTHI can summarize important information, identify dates, explain eligibility, list required documents, and answer questions about the content.`;
-  }
-
-  if (text.includes("simplify")) {
-    return `I can simplify complex content into clear and easy-to-understand language. This can help users with cognitive, language, or digital literacy barriers.`;
-  }
-
-  if (
-    text.includes("hindi") ||
-    text.includes("translate") ||
-    text.includes("language")
-  ) {
-    return `SAARTHI supports multilingual assistance. You can translate or simplify content into languages such as Hindi, Kannada, Tamil, Telugu, Marathi, Bengali, and Malayalam.`;
-  }
-
-  if (text.includes("accessibility")) {
-    return `SAARTHI helps personalize your digital experience with features such as larger text, high contrast, reduced motion, simple language, keyboard navigation, and other accessibility controls.`;
-  }
-
-  if (text.includes("hello") || text.includes("hi")) {
-    return `Hello! 👋 I am SAARTHI, your AI accessibility assistant. I can help you understand websites, documents, accessibility features, languages, and more. How can I help you today?`;
-  }
-
-  return `I understand your request. SAARTHI AI is designed to help make digital experiences simpler, more accessible, and personalized. Try asking me about website accessibility, documents, translation, or accessibility settings.`;
-};
-
-// =====================================================
-// DEMO WEBSITE ANALYZER
-// =====================================================
-
-export const analyzeDemoWebsite = async (
-  url: string
-): Promise<WebsiteAnalysis> => {
-  await new Promise((resolve) => setTimeout(resolve, 2500));
-
-  return {
-    ...demoWebsiteAnalysis,
-    id: crypto.randomUUID(),
-    url,
-    createdAt: new Date().toISOString(),
-  };
-};
-
-// =====================================================
-// DEMO DOCUMENT PROCESSING
-// =====================================================
-
-export const processDemoDocument = async () => {
-  await new Promise((resolve) => setTimeout(resolve, 2000));
-
-  return demoDocument;
-};
-
-// =====================================================
-// DEMO TRANSLATION
-// =====================================================
-
-export const translateDemoText = async (
-  text: string,
-  language: string
-): Promise<string> => {
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  return `[Demo ${language} Translation]\n\n${text}`;
-};
-
-// =====================================================
-// DEMO TEXT SIMPLIFICATION
-// =====================================================
-
-export const simplifyDemoText = async (
-  text: string
-): Promise<string> => {
-  await new Promise((resolve) => setTimeout(resolve, 1000));
-
-  return `Simplified version:\n\n${text}
-  
-This content has been processed by SAARTHI AI Demo Mode to demonstrate how complex information can be presented in a clearer and easier-to-understand format.`;
-};
-// Demo website analysis report
 export const DEMO_REPORT = {
   id: 'demo-report-001',
-  url: 'https://example.com',
+  url: 'https://www.india.gov.in',
   title: 'Example Website Accessibility Report',
-  score: 82,
-  summary:
-    'The website has good overall accessibility but still contains some issues that should be fixed.',
-  issues: [
-    {
-      id: 'issue-1',
-      type: 'error',
-      title: 'Missing image alt text',
-      description:
-        'Some images do not have alternative text for screen reader users.',
-    },
-    {
-      id: 'issue-2',
-      type: 'warning',
-      title: 'Low color contrast',
-      description:
-        'Some text does not have sufficient contrast against its background.',
-    },
-    {
-      id: 'issue-3',
-      type: 'info',
-      title: 'Heading structure',
-      description:
-        'Review the heading hierarchy to ensure it follows a logical order.',
-    },
-  ],
+  score: 78,
+  summary: DEMO_ANALYSES[0].summary,
+  issues: DEMO_ISSUES,
   createdAt: new Date().toISOString(),
 };
 
-// Demo analysis history
-export const DEMO_HISTORY = [
-  {
-    id: 'history-1',
-    url: 'https://example.com',
-    title: 'Example Website',
-    score: 82,
-    date: '2026-08-20',
-  },
-  {
-    id: 'history-2',
-    url: 'https://demo-site.com',
-    title: 'Demo Website',
-    score: 76,
-    date: '2026-08-19',
-  },
-  {
-    id: 'history-3',
-    url: 'https://sample.org',
-    title: 'Sample Organization',
-    score: 91,
-    date: '2026-08-18',
-  },
-];
-
-// Demo document for Document AI
-export const DEMO_DOCUMENT = {
-  id: 'demo-document-001',
-  name: 'Sample Accessibility Document.pdf',
-  type: 'application/pdf',
-  size: 245760,
-  uploadedAt: new Date().toISOString(),
-  status: 'completed',
-  content:
-    'This is a sample document used to demonstrate document accessibility analysis.',
-  issues: [
-    {
-      id: 'doc-issue-1',
-      type: 'warning',
-      message: 'Some headings may not follow a proper hierarchy.',
-    },
-    {
-      id: 'doc-issue-2',
-      type: 'error',
-      message: 'Some images may be missing alternative text.',
-    },
-  ],
-};
-
-// Language translations
 export const TRANSLATIONS = {
   en: {
     welcome: 'Welcome',

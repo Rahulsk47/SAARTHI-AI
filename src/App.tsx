@@ -48,6 +48,7 @@ export default function App() {
               <Route element={<ProtectedAppShell />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/analyzer" element={<WebsiteAnalyzer />} />
+                <Route path="/website-analyzer" element={<Navigate to="/analyzer" replace />} />
                 <Route path="/results" element={<AccessibilityResults />} />
                 <Route path="/accessible-view" element={<AccessibleView />} />
                 <Route path="/document-ai" element={<DocumentAI />} />

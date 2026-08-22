@@ -7,10 +7,14 @@ import {
   Send,
   Trash2,
   AlertCircle,
+  Sparkles,
+  VolumeX,
 } from 'lucide-react';
 
 import SaarthiCore from '@/components/SaarthiCore';
 import PageHeader from '@/components/PageHeader';
+import { queryVoice } from '@/lib/ai';
+import { addActivityLog } from '@/lib/data';
 import { type CoreState } from '@/types/core';
 
 interface TranscriptEntry {
@@ -18,12 +22,6 @@ interface TranscriptEntry {
   speaker: 'user' | 'saarthi';
   text: string;
 }
-
-/*
- * Browser Speech Recognition types.
- * These are declared here because TypeScript does not always
- * include the Web Speech API types by default.
- */
 
 interface SpeechRecognitionAlternative {
   transcript: string;
@@ -56,26 +54,13 @@ interface SpeechRecognitionInstance {
   interimResults: boolean;
   lang: string;
   maxAlternatives: number;
-
   start: () => void;
   stop: () => void;
   abort: () => void;
-
-  onresult:
-    | ((event: SpeechRecognitionEvent) => void)
-    | null;
-
-  onerror:
-    | ((event: SpeechRecognitionErrorEvent) => void)
-    | null;
-
-  onend:
-    | (() => void)
-    | null;
-
-  onstart:
-    | (() => void)
-    | null;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  onstart: (() => void) | null;
 }
 
 interface SpeechRecognitionConstructor {
@@ -87,140 +72,44 @@ interface SpeechRecognitionWindow extends Window {
   webkitSpeechRecognition?: SpeechRecognitionConstructor;
 }
 
-const DEMO_RESPONSES: Record<string, string> = {
-  default:
-    "I'm SAARTHI, your AI accessibility assistant. I can help you understand websites, simplify documents, translate between Indian languages, and check accessibility. What would you like to do?",
-
-  website:
-    "I can analyze any website for accessibility issues. Go to the Website Analyzer, enter a URL, and I'll check it for WCAG compliance, color contrast, keyboard navigation, and more. Would you like me to walk you through it?",
-
-  document:
-    "Upload any document to the Document AI page and I'll summarize it, extract important dates, check eligibility, list required documents, and give you next steps. I can also simplify or translate it for you.",
-
-  translate:
-    'I support English, Hindi, Kannada, Tamil, Telugu, Marathi, Bengali, and Malayalam. Open the Language Assistant to translate or simplify any text. You can also combine both modes.',
-
-  hello:
-    "Hello! I'm here to help make the internet accessible to you. How can I assist today?",
-
-  help:
-    'I can help you with analyzing websites for accessibility, simplifying complex documents, translating between 8 Indian languages, reading content aloud, and personalizing your experience. Just tell me what you need!',
-};
-
-function getResponse(input: string): string {
-  const question = input.toLowerCase().trim();
-
-  if (
-    question.includes('website') ||
-    question.includes('analyze') ||
-    question.includes('analyse') ||
-    question.includes('url')
-  ) {
-    return DEMO_RESPONSES.website;
-  }
-
-  if (
-    question.includes('document') ||
-    question.includes('pdf') ||
-    question.includes('upload')
-  ) {
-    return DEMO_RESPONSES.document;
-  }
-
-  if (
-    question.includes('translate') ||
-    question.includes('translation') ||
-    question.includes('language') ||
-    question.includes('hindi') ||
-    question.includes('kannada')
-  ) {
-    return DEMO_RESPONSES.translate;
-  }
-
-  if (
-    question === 'hi' ||
-    question.startsWith('hi ') ||
-    question.includes('hello') ||
-    question.includes('hey')
-  ) {
-    return DEMO_RESPONSES.hello;
-  }
-
-  if (
-    question.includes('help') ||
-    question.includes('what can you do') ||
-    question.includes('what can you help')
-  ) {
-    return DEMO_RESPONSES.help;
-  }
-
-  return DEMO_RESPONSES.default;
-}
+const QUICK_SUGGESTIONS = [
+  'How do I make a website accessible for screen reader users?',
+  'What is the minimum WCAG AA color contrast ratio?',
+  'How to structure headings and skip links properly?',
+  'Explain what ARIA live regions are used for.',
+];
 
 export default function VoiceAssistant() {
   const [listening, setListening] = useState(false);
+  const [coreState, setCoreState] = useState<CoreState>('idle');
+  const [speaking, setSpeaking] = useState(false);
+  const [transcript, setTranscript] = useState<TranscriptEntry[]>([
+    {
+      id: 'init',
+      speaker: 'saarthi',
+      text: "Hello! I am SAARTHI AI, your voice-guided digital accessibility assistant. Ask me anything about WCAG guidelines, website remediation, or public services.",
+    },
+  ]);
+  const [textInput, setTextInput] = useState('');
+  const [waveform, setWaveform] = useState<number[]>(new Array(32).fill(0.1));
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const [coreState, setCoreState] =
-    useState<CoreState>('idle');
-
-  const [transcript, setTranscript] =
-    useState<TranscriptEntry[]>([
-      {
-        id: 'init',
-        speaker: 'saarthi',
-        text: DEMO_RESPONSES.default,
-      },
-    ]);
-
-  const [textInput, setTextInput] =
-    useState('');
-
-  const [waveform, setWaveform] =
-    useState<number[]>(
-      new Array(32).fill(0.1)
-    );
-
-  const [errorMessage, setErrorMessage] =
-    useState('');
-
-  const recognitionRef =
-    useRef<SpeechRecognitionInstance | null>(null);
-
-  const transcriptEndRef =
-    useRef<HTMLDivElement | null>(null);
-
-  const responseTimeoutRef =
-    useRef<number | null>(null);
-
-  /*
-   * Scroll transcript to latest message.
-   */
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const transcriptEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    transcriptEndRef.current?.scrollIntoView({
-      behavior: 'smooth',
-    });
-  }, [transcript]);
-
-  /*
-   * Animate waveform while listening.
-   */
+    transcriptEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [transcript, coreState]);
 
   useEffect(() => {
     if (!listening) {
-      setWaveform(
-        new Array(32).fill(0.1)
-      );
-
+      setWaveform(new Array(32).fill(0.1));
       return;
     }
 
     const intervalId = window.setInterval(() => {
       setWaveform(
-        Array.from(
-          { length: 32 },
-          () => 0.15 + Math.random() * 0.85
-        )
+        Array.from({ length: 32 }, () => 0.15 + Math.random() * 0.85),
       );
     }, 100);
 
@@ -229,114 +118,57 @@ export default function VoiceAssistant() {
     };
   }, [listening]);
 
-  /*
-   * Clean up recognition, speech synthesis and
-   * pending timers when leaving the page.
-   */
-
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort();
-        } catch {
-          // Recognition may already be stopped.
-        }
+        } catch {}
       }
-
-      if (
-        'speechSynthesis' in window
-      ) {
+      if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-      }
-
-      if (
-        responseTimeoutRef.current !== null
-      ) {
-        window.clearTimeout(
-          responseTimeoutRef.current
-        );
       }
     };
   }, []);
 
-  /*
-   * Get browser speech recognition implementation.
-   */
-
-  const getSpeechRecognition =
-    (): SpeechRecognitionConstructor | null => {
-      const speechWindow =
-        window as SpeechRecognitionWindow;
-
-      return (
-        speechWindow.SpeechRecognition ??
-        speechWindow.webkitSpeechRecognition ??
-        null
-      );
-    };
-
-  /*
-   * Stop current speech recognition safely.
-   */
+  const getSpeechRecognition = (): SpeechRecognitionConstructor | null => {
+    const speechWindow = window as SpeechRecognitionWindow;
+    return (
+      speechWindow.SpeechRecognition ??
+      speechWindow.webkitSpeechRecognition ??
+      null
+    );
+  };
 
   const stopRecognition = () => {
-    if (!recognitionRef.current) {
-      return;
-    }
-
+    if (!recognitionRef.current) return;
     try {
       recognitionRef.current.stop();
-    } catch {
-      // Ignore if recognition has already stopped.
-    }
-
+    } catch {}
     recognitionRef.current = null;
   };
 
-  /*
-   * Start microphone recognition.
-   */
-
   const startListening = () => {
-    if (listening) {
-      return;
-    }
-
+    if (listening) return;
     setErrorMessage('');
 
-    /*
-     * Stop any previous speech synthesis.
-     */
-
-    if (
-      'speechSynthesis' in window
-    ) {
+    if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
+      setSpeaking(false);
     }
 
-    const SpeechRecognition =
-      getSpeechRecognition();
-
-    /*
-     * Browser does not support Speech Recognition.
-     */
-
+    const SpeechRecognition = getSpeechRecognition();
     if (!SpeechRecognition) {
       setErrorMessage(
-        'Voice recognition is not supported in this browser. Please use Google Chrome or Microsoft Edge, or type your question below.'
+        'Voice recognition API is not supported directly in this browser environment. You can type queries below, or use Google Chrome/Edge.',
       );
-
       setCoreState('idle');
       setListening(false);
-
       return;
     }
 
     try {
-      const recognition =
-        new SpeechRecognition();
-
+      const recognition = new SpeechRecognition();
       recognition.continuous = false;
       recognition.interimResults = false;
       recognition.lang = 'en-IN';
@@ -350,90 +182,38 @@ export default function VoiceAssistant() {
         setErrorMessage('');
       };
 
-      recognition.onresult = (
-        event: SpeechRecognitionEvent
-      ) => {
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
         let transcriptText = '';
-
-        for (
-          let i = event.resultIndex;
-          i < event.results.length;
-          i += 1
-        ) {
-          const result =
-            event.results[i];
-
-          if (
-            result &&
-            result.isFinal &&
-            result[0]
-          ) {
-            transcriptText +=
-              result[0].transcript;
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+          const result = event.results[i];
+          if (result && result.isFinal && result[0]) {
+            transcriptText += result[0].transcript;
           }
         }
-
         if (transcriptText.trim()) {
-          finalText +=
-            transcriptText + ' ';
+          finalText += transcriptText + ' ';
         }
       };
 
-      recognition.onerror = (
-        event: SpeechRecognitionErrorEvent
-      ) => {
-        console.error(
-          'Speech recognition error:',
-          event.error
-        );
-
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.warn('Speech recognition notice:', event.error);
         setListening(false);
         setCoreState('idle');
 
-        if (
-          event.error ===
-          'not-allowed'
-        ) {
-          setErrorMessage(
-            'Microphone permission was denied. Please allow microphone access in your browser settings.'
-          );
-        } else if (
-          event.error ===
-          'no-speech'
-        ) {
-          setErrorMessage(
-            'No speech was detected. Please try speaking again.'
-          );
-        } else if (
-          event.error ===
-          'audio-capture'
-        ) {
-          setErrorMessage(
-            'No microphone was detected. Please check your microphone.'
-          );
-        } else if (
-          event.error ===
-          'network'
-        ) {
-          setErrorMessage(
-            'Speech recognition could not connect. Please check your internet connection.'
-          );
+        if (event.error === 'not-allowed') {
+          setErrorMessage('Microphone access was denied. Please allow microphone permissions or type below.');
+        } else if (event.error === 'no-speech') {
+          setErrorMessage('No speech detected. Please speak clearly into your microphone.');
         } else {
-          setErrorMessage(
-            'Voice recognition failed. Please try again.'
-          );
+          setErrorMessage(`Speech recognition notice (${event.error}). You can type below.`);
         }
-
         recognitionRef.current = null;
       };
 
       recognition.onend = () => {
         setListening(false);
         recognitionRef.current = null;
-
-        const text =
-          finalText.trim();
-
+        const text = finalText.trim();
         if (text) {
           submitQuery(text);
         } else {
@@ -441,242 +221,131 @@ export default function VoiceAssistant() {
         }
       };
 
-      recognitionRef.current =
-        recognition;
-
+      recognitionRef.current = recognition;
       recognition.start();
     } catch (error) {
-      console.error(
-        'Could not start speech recognition:',
-        error
-      );
-
+      console.error('Could not start recognition:', error);
       setListening(false);
       setCoreState('idle');
-
-      setErrorMessage(
-        'Could not start the microphone. Please check your browser microphone permission.'
-      );
-
+      setErrorMessage('Could not initialize microphone. Please type your query below.');
       recognitionRef.current = null;
     }
   };
 
-  /*
-   * Stop microphone recognition.
-   */
-
   const stopListening = () => {
     setListening(false);
     setCoreState('idle');
-
     stopRecognition();
   };
 
-  /*
-   * Submit a question.
-   */
-
-  const submitQuery = (
-    text: string
-  ) => {
-    const cleanText =
-      text.trim();
-
-    if (!cleanText) {
-      return;
-    }
+  const submitQuery = async (text: string) => {
+    const cleanText = text.trim();
+    if (!cleanText) return;
 
     setErrorMessage('');
-
-    /*
-     * Stop microphone if still active.
-     */
-
     if (recognitionRef.current) {
       stopRecognition();
     }
-
-    /*
-     * Stop current speech.
-     */
-
-    if (
-      'speechSynthesis' in window
-    ) {
+    if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
+      setSpeaking(false);
     }
 
-    const userEntry: TranscriptEntry =
-      {
-        id: `user-${Date.now()}`,
-        speaker: 'user',
-        text: cleanText,
-      };
+    const userEntry: TranscriptEntry = {
+      id: `user-${Date.now()}`,
+      speaker: 'user',
+      text: cleanText,
+    };
 
-    setTranscript(
-      (previous) => [
-        ...previous,
-        userEntry,
-      ]
-    );
-
+    setTranscript((prev) => [...prev, userEntry]);
     setCoreState('thinking');
 
-    /*
-     * Clear previous response timer.
-     */
+    try {
+      const reply = await queryVoice(cleanText);
+      await addActivityLog('voice', 'Voice Assistant', cleanText.slice(0, 40));
 
-    if (
-      responseTimeoutRef.current !== null
-    ) {
-      window.clearTimeout(
-        responseTimeoutRef.current
-      );
+      const saarthiEntry: TranscriptEntry = {
+        id: `saarthi-${Date.now()}`,
+        speaker: 'saarthi',
+        text: reply,
+      };
+
+      setTranscript((prev) => [...prev, saarthiEntry]);
+      speakResponse(reply);
+    } catch (err: any) {
+      console.error('Voice AI error:', err);
+      const fallbackReply = `I understand your question about "${cleanText}". SAARTHI AI is built to evaluate WCAG 2.1 compliance, simplify government documents, and translate between 8 Indian languages.`;
+      setTranscript((prev) => [
+        ...prev,
+        { id: `saarthi-${Date.now()}`, speaker: 'saarthi', text: fallbackReply },
+      ]);
+      speakResponse(fallbackReply);
     }
-
-    /*
-     * Simulate AI processing.
-     */
-
-    responseTimeoutRef.current =
-      window.setTimeout(() => {
-        const reply =
-          getResponse(cleanText);
-
-        const saarthiEntry: TranscriptEntry =
-          {
-            id: `saarthi-${Date.now()}`,
-            speaker: 'saarthi',
-            text: reply,
-          };
-
-        setTranscript(
-          (previous) => [
-            ...previous,
-            saarthiEntry,
-          ]
-        );
-
-        speakResponse(reply);
-
-        responseTimeoutRef.current =
-          null;
-      }, 1000);
   };
 
-  /*
-   * Speak SAARTHI response.
-   */
-
-  const speakResponse = (
-    text: string
-  ) => {
-    if (
-      !('speechSynthesis' in window)
-    ) {
+  const speakResponse = (text: string) => {
+    if (!('speechSynthesis' in window)) {
       setCoreState('success');
       return;
     }
 
     try {
       window.speechSynthesis.cancel();
-
-      const utterance =
-        new SpeechSynthesisUtterance(
-          text
-        );
-
+      const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'en-IN';
       utterance.rate = 0.95;
       utterance.pitch = 1;
-      utterance.volume = 1;
 
       utterance.onstart = () => {
+        setSpeaking(true);
         setCoreState('processing');
       };
 
       utterance.onend = () => {
+        setSpeaking(false);
         setCoreState('success');
+        setTimeout(() => setCoreState('idle'), 2500);
       };
 
-      utterance.onerror = (
-        event
-      ) => {
-        console.error(
-          'Speech synthesis error:',
-          event
-        );
-
-        setCoreState('success');
+      utterance.onerror = () => {
+        setSpeaking(false);
+        setCoreState('idle');
       };
 
-      window.speechSynthesis.speak(
-        utterance
-      );
-    } catch (error) {
-      console.error(
-        'Speech synthesis failed:',
-        error
-      );
-
-      setCoreState('success');
+      window.speechSynthesis.speak(utterance);
+    } catch {
+      setCoreState('idle');
     }
   };
 
-  /*
-   * Send typed message.
-   */
+  const stopSpeaking = () => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      setSpeaking(false);
+      setCoreState('idle');
+    }
+  };
 
   const handleSend = () => {
-    const message =
-      textInput.trim();
-
-    if (!message) {
-      return;
-    }
-
+    const message = textInput.trim();
+    if (!message) return;
     setTextInput('');
-
     submitQuery(message);
   };
 
-  /*
-   * Clear transcript.
-   */
-
   const clearTranscript = () => {
-    if (
-      recognitionRef.current
-    ) {
-      stopRecognition();
-    }
-
-    if (
-      'speechSynthesis' in window
-    ) {
+    if (recognitionRef.current) stopRecognition();
+    if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
+      setSpeaking(false);
     }
-
-    if (
-      responseTimeoutRef.current !== null
-    ) {
-      window.clearTimeout(
-        responseTimeoutRef.current
-      );
-
-      responseTimeoutRef.current =
-        null;
-    }
-
     setTranscript([
       {
         id: 'init',
         speaker: 'saarthi',
-        text: DEMO_RESPONSES.default,
+        text: "Hello! I am SAARTHI AI. How can I assist with your accessibility needs?",
       },
     ]);
-
     setTextInput('');
     setListening(false);
     setCoreState('idle');
@@ -685,100 +354,51 @@ export default function VoiceAssistant() {
 
   return (
     <div className="px-6 py-8 md:px-10">
-
-      {/* =====================================================
-          HEADER
-      ===================================================== */}
-
       <PageHeader
         title="Voice Assistant"
-        subtitle="Talk to SAARTHI AI. The Core reacts to your voice in real time."
+        subtitle="Conversational AI accessibility assistant powered by Gemini 2.5."
         icon={Mic}
       />
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-
-        {/* =====================================================
-            LEFT SIDE
-        ===================================================== */}
-
+        {/* LEFT SIDE */}
         <div className="flex flex-col items-center justify-center">
-
           <div className="relative">
-
-            <SaarthiCore
-              state={coreState}
-              size={320}
-              showStars={false}
-            />
-
+            <SaarthiCore state={coreState} size={320} showStars={false} />
             {listening && (
               <motion.div
-                initial={{
-                  scale: 0.8,
-                  opacity: 0.5,
-                }}
-                animate={{
-                  scale: 1.4,
-                  opacity: 0,
-                }}
-                transition={{
-                  duration: 1.5,
-                  repeat: Infinity,
-                }}
+                initial={{ scale: 0.8, opacity: 0.5 }}
+                animate={{ scale: 1.4, opacity: 0 }}
+                transition={{ duration: 1.5, repeat: Infinity }}
                 className="absolute inset-0 rounded-full border-2 border-core-400"
               />
             )}
-
           </div>
 
-          {/* =================================================
-              WAVEFORM
-          ================================================= */}
-
+          {/* WAVEFORM */}
           <div
             className="mt-6 flex h-16 items-center gap-1"
-            aria-label={
-              listening
-                ? 'Voice waveform'
-                : 'Voice inactive'
-            }
+            aria-label={listening ? 'Voice waveform active' : 'Voice inactive'}
           >
-            {waveform.map(
-              (height, index) => (
-                <motion.div
-                  key={index}
-                  animate={{
-                    height: `${Math.max(
-                      height * 100,
-                      4
-                    )}%`,
-                  }}
-                  transition={{
-                    duration: 0.1,
-                  }}
-                  className={`w-1.5 rounded-full ${
-                    listening
-                      ? 'bg-core-400'
-                      : 'bg-slate-700'
-                  }`}
-                />
-              )
-            )}
+            {waveform.map((height, index) => (
+              <motion.div
+                key={index}
+                animate={{ height: `${Math.max(height * 100, 6)}%` }}
+                transition={{ duration: 0.1 }}
+                className={`w-1.5 rounded-full ${
+                  listening ? 'bg-core-400' : 'bg-slate-700'
+                }`}
+              />
+            ))}
           </div>
 
-          {/* =================================================
-              MICROPHONE
-          ================================================= */}
-
+          {/* CONTROLS */}
           <div className="mt-6 flex items-center gap-4">
-
             {!listening ? (
               <button
                 type="button"
-                onClick={
-                  startListening
-                }
+                id="voice-start-mic-button"
+                onClick={startListening}
                 className="flex h-16 w-16 items-center justify-center rounded-full bg-core-500 text-ink-950 shadow-glow-lg transition hover:scale-105"
                 aria-label="Start listening"
               >
@@ -787,9 +407,8 @@ export default function VoiceAssistant() {
             ) : (
               <button
                 type="button"
-                onClick={
-                  stopListening
-                }
+                id="voice-stop-mic-button"
+                onClick={stopListening}
                 className="flex h-16 w-16 items-center justify-center rounded-full bg-danger-500 text-white shadow-lg transition hover:scale-105"
                 aria-label="Stop listening"
               >
@@ -797,227 +416,153 @@ export default function VoiceAssistant() {
               </button>
             )}
 
+            {speaking && (
+              <button
+                onClick={stopSpeaking}
+                className="btn-secondary text-xs flex items-center gap-1 text-warning-400"
+              >
+                <VolumeX size={14} /> Stop Voice
+              </button>
+            )}
           </div>
 
-          <div className="mt-3 text-center text-sm text-slate-500">
+          <div className="mt-3 text-center text-sm text-slate-400">
             {listening
               ? 'Listening… speak now'
-              : 'Tap the microphone to speak'}
+              : 'Tap microphone or choose a prompt below'}
           </div>
 
-          {/* =================================================
-              ERROR MESSAGE
-          ================================================= */}
+          {/* QUICK PROMPTS */}
+          <div className="mt-6 flex flex-wrap justify-center gap-2 max-w-md">
+            {QUICK_SUGGESTIONS.map((q) => (
+              <button
+                key={q}
+                onClick={() => submitQuery(q)}
+                className="chip border border-white/10 text-xs text-slate-400 hover:border-core-400/40 hover:text-core-200 text-left"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
 
           {errorMessage && (
             <div className="mt-5 flex max-w-md items-start gap-2 rounded-xl border border-danger-500/20 bg-danger-500/5 p-3 text-xs text-danger-400">
-
-              <AlertCircle
-                size={15}
-                className="mt-0.5 shrink-0"
-              />
-
-              <span>
-                {errorMessage}
-              </span>
-
+              <AlertCircle size={15} className="mt-0.5 shrink-0" />
+              <span>{errorMessage}</span>
             </div>
           )}
-
         </div>
 
-        {/* =====================================================
-            RIGHT SIDE - TRANSCRIPT
-        ===================================================== */}
-
+        {/* RIGHT SIDE - TRANSCRIPT */}
         <div
           className="card flex flex-col"
-          style={{
-            minHeight: '500px',
-          }}
+          style={{ minHeight: '520px' }}
         >
-
           <div className="mb-4 flex items-center justify-between">
-
-            <h3 className="font-display text-lg font-semibold text-white">
-              Transcript
+            <h3 className="font-display text-lg font-semibold text-white flex items-center gap-2">
+              <Sparkles size={16} className="text-core-400" /> Live AI Dialogue
             </h3>
 
             <button
               type="button"
-              onClick={
-                clearTranscript
-              }
+              onClick={clearTranscript}
               className="text-slate-500 transition hover:text-danger-400"
               aria-label="Clear transcript"
               title="Clear transcript"
             >
               <Trash2 size={16} />
             </button>
-
           </div>
 
-          {/* =================================================
-              MESSAGES
-          ================================================= */}
-
+          {/* MESSAGES */}
           <div className="flex-1 space-y-3 overflow-y-auto pr-1">
-
-            <AnimatePresence
-              initial={false}
-            >
-              {transcript.map(
-                (entry) => (
-                  <motion.div
-                    key={entry.id}
-                    initial={{
-                      opacity: 0,
-                      y: 10,
-                    }}
-                    animate={{
-                      opacity: 1,
-                      y: 0,
-                    }}
-                    className={`flex ${
-                      entry.speaker ===
-                      'user'
-                        ? 'justify-end'
-                        : 'justify-start'
+            <AnimatePresence initial={false}>
+              {transcript.map((entry) => (
+                <motion.div
+                  key={entry.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className={`flex ${
+                    entry.speaker === 'user' ? 'justify-end' : 'justify-start'
+                  }`}
+                >
+                  <div
+                    className={`max-w-[85%] rounded-2xl border p-3.5 text-sm ${
+                      entry.speaker === 'user'
+                        ? 'border-core-400/20 bg-core-500/15 text-core-100'
+                        : 'border-white/5 bg-ink-900/60 text-slate-200'
                     }`}
                   >
-
-                    <div
-                      className={`max-w-[85%] rounded-2xl border p-3.5 text-sm ${
-                        entry.speaker ===
-                        'user'
-                          ? 'border-core-400/20 bg-core-500/15 text-core-100'
-                          : 'border-white/5 bg-ink-900/60 text-slate-300'
-                      }`}
-                    >
-
-                      <div className="mb-1 flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-slate-500">
-
-                        {entry.speaker ===
-                        'user' ? (
-                          <>
-                            <Mic size={10} />
-                            You
-                          </>
-                        ) : (
-                          <>
-                            <Volume2
-                              size={10}
-                            />
-                            SAARTHI
-                          </>
-                        )}
-
-                      </div>
-
-                      <div className="whitespace-pre-wrap">
-                        {entry.text}
-                      </div>
-
+                    <div className="mb-1 flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-slate-500">
+                      {entry.speaker === 'user' ? (
+                        <>
+                          <Mic size={10} /> You
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 size={10} className="text-core-400" /> SAARTHI AI
+                        </>
+                      )}
                     </div>
-
-                  </motion.div>
-                )
-              )}
+                    <div className="whitespace-pre-wrap leading-relaxed">
+                      {entry.text}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
             </AnimatePresence>
 
-            {/* THINKING */}
-
-            {coreState ===
-              'thinking' && (
+            {coreState === 'thinking' && (
               <div className="flex justify-start">
-
                 <div className="rounded-2xl border border-white/5 bg-ink-900/60 p-3.5">
-
                   <div className="flex gap-1">
-
-                    {[0, 1, 2].map(
-                      (index) => (
-                        <motion.div
-                          key={index}
-                          animate={{
-                            opacity: [
-                              0.3,
-                              1,
-                              0.3,
-                            ],
-                          }}
-                          transition={{
-                            duration: 0.8,
-                            repeat:
-                              Infinity,
-                            delay:
-                              index *
-                              0.2,
-                          }}
-                          className="h-2 w-2 rounded-full bg-core-400"
-                        />
-                      )
-                    )}
-
+                    {[0, 1, 2].map((index) => (
+                      <motion.div
+                        key={index}
+                        animate={{ opacity: [0.3, 1, 0.3] }}
+                        transition={{
+                          duration: 0.8,
+                          repeat: Infinity,
+                          delay: index * 0.2,
+                        }}
+                        className="h-2 w-2 rounded-full bg-core-400"
+                      />
+                    ))}
                   </div>
-
                 </div>
-
               </div>
             )}
 
-            <div
-              ref={
-                transcriptEndRef
-              }
-            />
-
+            <div ref={transcriptEndRef} />
           </div>
 
-          {/* =================================================
-              TEXT INPUT
-          ================================================= */}
-
+          {/* TEXT INPUT */}
           <div className="mt-4 flex gap-2 border-t border-white/5 pt-4">
-
             <input
               type="text"
               value={textInput}
-              onChange={(event) =>
-                setTextInput(
-                  event.target.value
-                )
-              }
-              onKeyDown={(event) => {
-                if (
-                  event.key === 'Enter'
-                ) {
-                  event.preventDefault();
+              onChange={(e) => setTextInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
                   handleSend();
                 }
               }}
-              placeholder="Or type your question…"
+              placeholder="Or type your question here…"
               className="input flex-1"
               aria-label="Type a question"
             />
 
             <button
               type="button"
-              onClick={
-                handleSend
-              }
-              disabled={
-                !textInput.trim()
-              }
+              onClick={handleSend}
+              disabled={!textInput.trim()}
               className="btn-primary disabled:cursor-not-allowed disabled:opacity-40"
               aria-label="Send"
-              title="Send message"
             >
               <Send size={16} />
             </button>
-
           </div>
-
         </div>
       </div>
     </div>

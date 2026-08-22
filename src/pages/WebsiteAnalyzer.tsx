@@ -11,36 +11,38 @@ import {
 import { motion } from 'framer-motion';
 import SaarthiCore from '@/components/SaarthiCore';
 import PageHeader from '@/components/PageHeader';
-import { analyzeWebsite, type AccessibilityAnalysisResult } from '@/lib/ai';
-import { supabase } from '@/lib/supabase';
+import { analyzeWebsite } from '@/lib/ai';
+import { saveWebsiteAnalysis } from '@/lib/data';
 import type { CoreState } from '@/types/core';
 
 const SAMPLE_URLS = [
+  'https://www.india.gov.in',
+  'https://uidai.gov.in',
+  'https://www.cowin.gov.in',
+  'https://en.wikipedia.org',
   'https://example.com',
-  'https://www.wikipedia.org',
-  'https://www.gov.in',
 ];
 
 const STEPS = [
   {
     state: 'processing' as CoreState,
     label: 'Fetching website',
-    desc: 'Retrieving public HTML content',
+    desc: 'Retrieving public HTML content & landmarks',
   },
   {
     state: 'analyzing' as CoreState,
     label: 'Checking accessibility',
-    desc: 'Inspecting common accessibility issues',
+    desc: 'Auditing WCAG 2.1 AA rules, contrast, and tags',
   },
   {
     state: 'thinking' as CoreState,
-    label: 'Calculating score',
-    desc: 'Preparing your accessibility report',
+    label: 'Calculating score & fixes',
+    desc: 'Generating actionable remediation guide',
   },
   {
     state: 'success' as CoreState,
     label: 'Saving report',
-    desc: 'Saving results securely to your account',
+    desc: 'Saving audit results to your history',
   },
 ];
 
@@ -53,94 +55,26 @@ export default function WebsiteAnalyzer() {
   const [saved, setSaved] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const saveAnalysis = async (
-    result: AccessibilityAnalysisResult,
-  ) => {
-    const { data: sessionData, error: sessionError } =
-      await supabase.auth.getSession();
-
-    if (sessionError || !sessionData.session?.user) {
-      throw new Error('Please log in before saving an analysis.');
-    }
-
-    const { data: analysis, error: analysisError } = await supabase
-      .from('website_analyses')
-      .insert({
-        url: result.url,
-        score: result.score,
-        summary: result.summary,
-      })
-      .select()
-      .single();
-
-    if (analysisError || !analysis) {
-      throw new Error(
-        analysisError?.message || 'Failed to save website analysis.',
-      );
-    }
-
-    if (result.issues.length > 0) {
-      const { error: issuesError } = await supabase
-        .from('website_issues')
-        .insert(
-          result.issues.map((issue) => ({
-            analysis_id: analysis.id,
-            title: issue.title,
-            severity: issue.severity,
-            category: issue.category,
-            description: issue.description,
-            recommendation: issue.recommendation,
-            wcag: issue.wcag,
-            count: issue.count,
-          })),
-        );
-
-      if (issuesError) {
-        throw new Error(
-          `Analysis was saved, but issues could not be saved: ${issuesError.message}`,
-        );
-      }
-    }
-
-    const { error: activityError } = await supabase
-      .from('activity_logs')
-      .insert({
-        type: 'website',
-        title: result.url,
-        detail: `Accessibility analysis · ${result.issues.length} issue types found`,
-        score: result.score,
-      });
-
-    if (activityError) {
-      console.error('Unable to save activity log:', activityError);
-    }
-  };
-
   const startAnalysis = async (targetUrl?: string) => {
     if (running) {
       return;
     }
 
-    const finalUrl = (targetUrl ?? url).trim();
+    let finalUrl = (targetUrl ?? url).trim();
 
     if (!finalUrl) {
       setErrorMessage('Please enter a website URL.');
       return;
     }
 
-    try {
-      const parsedUrl = new URL(finalUrl);
+    if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+      finalUrl = `https://${finalUrl}`;
+    }
 
-      if (
-        parsedUrl.protocol !== 'http:' &&
-        parsedUrl.protocol !== 'https:'
-      ) {
-        throw new Error();
-      }
+    try {
+      new URL(finalUrl);
     } catch {
-      setErrorMessage(
-        'Enter a valid public website URL, for example https://example.com.',
-      );
+      setErrorMessage('Enter a valid website URL (e.g. https://www.india.gov.in).');
       return;
     }
 
@@ -151,35 +85,39 @@ export default function WebsiteAnalyzer() {
     setStepIndex(0);
 
     try {
-      for (let index = 0; index < STEPS.length - 1; index += 1) {
-        setStepIndex(index);
+      // Step 1: Fetching
+      setStepIndex(0);
+      await new Promise((r) => setTimeout(r, 600));
 
-        await new Promise((resolve) => {
-          window.setTimeout(resolve, 650);
-        });
-      }
-
-      setStepIndex(2);
-
+      // Step 2: Analyzing
+      setStepIndex(1);
       const result = await analyzeWebsite(finalUrl);
 
+      // Step 3: Thinking / computing report
+      setStepIndex(2);
+      await new Promise((r) => setTimeout(r, 600));
+
+      // Step 4: Saving
       setStepIndex(3);
-
-      await saveAnalysis(result);
-
-      setSaved(true);
-      setStepIndex(STEPS.length - 1);
-
-      window.setTimeout(() => {
-        navigate('/results');
-      }, 900);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : 'Unable to analyze this website.',
+      const savedItem = await saveWebsiteAnalysis(
+        result.url,
+        result.score,
+        result.summary,
+        result.issues,
+        result.breakdown,
+        result.quickFixes,
       );
 
+      setSaved(true);
+
+      setTimeout(() => {
+        navigate(`/results?id=${savedItem.id}`);
+      }, 800);
+    } catch (error: any) {
+      console.error('Analysis error:', error);
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Unable to analyze this website.',
+      );
       setStepIndex(-1);
     } finally {
       setRunning(false);
@@ -187,15 +125,13 @@ export default function WebsiteAnalyzer() {
   };
 
   const currentState =
-    stepIndex >= 0
-      ? STEPS[stepIndex]?.state ?? 'idle'
-      : 'idle';
+    stepIndex >= 0 ? STEPS[stepIndex]?.state ?? 'idle' : 'idle';
 
   return (
     <div className="px-6 py-8 md:px-10">
       <PageHeader
         title="Website Analyzer"
-        subtitle="Analyze a public website and save its accessibility report."
+        subtitle="Perform deep WCAG 2.1 accessibility audits on any public website."
         icon={Globe}
       />
 
@@ -225,12 +161,13 @@ export default function WebsiteAnalyzer() {
                     void startAnalysis();
                   }
                 }}
-                placeholder="https://example.com"
+                placeholder="https://www.india.gov.in"
                 className="input flex-1"
               />
 
               <button
                 type="button"
+                id="start-analyze-button"
                 disabled={running || !url.trim()}
                 onClick={() => {
                   void startAnalysis();
@@ -242,9 +179,9 @@ export default function WebsiteAnalyzer() {
               </button>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap items-center gap-2">
               <span className="self-center text-xs text-slate-500">
-                Try:
+                Quick Test:
               </span>
 
               {SAMPLE_URLS.map((sampleUrl) => (
@@ -265,7 +202,7 @@ export default function WebsiteAnalyzer() {
             {saved && (
               <div className="mt-4 flex items-center gap-2 rounded-xl border border-success-500/20 bg-success-500/5 p-3 text-sm text-success-400">
                 <CheckCircle2 size={16} />
-                Analysis saved successfully.
+                Analysis saved successfully! Redirecting to report…
               </div>
             )}
 
@@ -279,7 +216,7 @@ export default function WebsiteAnalyzer() {
 
           <div className="card">
             <h2 className="mb-4 font-display text-lg font-semibold text-white">
-              Analysis Pipeline
+              Automated Audit Pipeline
             </h2>
 
             <div className="space-y-3">
@@ -329,8 +266,7 @@ export default function WebsiteAnalyzer() {
 
             <div className="mt-4 flex items-start gap-2 rounded-xl border border-white/5 bg-ink-900/40 p-3 text-xs text-slate-500">
               <Info size={14} className="mt-0.5 shrink-0" />
-              The automated check finds common HTML accessibility issues.
-              Manual WCAG testing is still recommended.
+              SAARTHI uses automated DOM inspection combined with Gemini 2.5 AI to audit semantic structure, keyboard navigation, color contrast, and assistive tech compatibility.
             </div>
           </div>
         </div>
@@ -345,22 +281,22 @@ export default function WebsiteAnalyzer() {
           <div className="mt-6 text-center">
             <div className="font-display text-xl font-semibold text-white">
               {running
-                ? STEPS[stepIndex]?.label ?? 'Analyzing'
-                : 'Ready'}
+                ? STEPS[stepIndex]?.label ?? 'Auditing Website'
+                : 'Ready for Analysis'}
             </div>
 
             <div className="text-sm text-slate-500">
               {running
                 ? STEPS[stepIndex]?.desc ??
-                  'Processing your request'
-                : 'Enter a URL to begin'}
+                  'Processing website elements and WCAG criteria'
+                : 'Enter a URL to evaluate accessibility barriers'}
             </div>
           </div>
 
           {!running && (
             <div className="mt-8 flex items-center gap-2 text-sm text-slate-500">
               <Sparkles size={14} className="text-core-400" />
-              Results are saved securely to your account.
+              Full WCAG 2.1 Level AA & AAA checklist included.
             </div>
           )}
         </div>

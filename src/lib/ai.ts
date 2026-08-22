@@ -1,14 +1,3 @@
-import { supabase } from '@/lib/supabase';
-
-const EDGE_FUNCTION_URL =
-  `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/saarthi-ai`;
-
-interface AIResponse {
-  reply: string;
-  configured: boolean;
-  error?: string;
-}
-
 export interface AccessibilityIssueResult {
   title: string;
   severity: 'critical' | 'serious' | 'moderate' | 'minor';
@@ -19,51 +8,53 @@ export interface AccessibilityIssueResult {
   count: number;
 }
 
-export interface AccessibilityAnalysisResult {
+export interface WebsiteAnalysisResult {
   url: string;
   score: number;
   summary: string;
+  breakdown?: {
+    perceivable: number;
+    operable: number;
+    understandable: number;
+    robust: number;
+  };
   issues: AccessibilityIssueResult[];
+  quickFixes?: Array<{
+    title: string;
+    code: string;
+    explanation: string;
+  }>;
 }
 
-async function callEdgeFunction(
-  body: Record<string, unknown>,
-): Promise<AIResponse> {
-  const { data: session } = await supabase.auth.getSession();
-  const accessToken = session?.session?.access_token;
+export type AccessibilityAnalysisResult = WebsiteAnalysisResult;
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-  };
+export interface DocumentAnalysisResult {
+  file_name: string;
+  summary: string;
+  important_dates: Array<{ date: string; event: string }>;
+  eligibility: string[];
+  required_documents: string[];
+  important_info: string[];
+  next_steps: string[];
+}
 
-  if (accessToken) {
-    headers.Authorization = `Bearer ${accessToken}`;
-  }
-
-  const response = await fetch(EDGE_FUNCTION_URL, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const errorData = await response
-      .json()
-      .catch(() => ({ error: 'Request failed' }));
-
-    throw new Error(
-      errorData.error || `Request failed (${response.status})`,
-    );
-  }
-
-  const data: AIResponse = await response.json();
-
-  if (!data.configured) {
-    throw new Error(data.error || 'AI is not configured.');
-  }
-
-  return data;
+export interface AccessibleTransformResult {
+  title: string;
+  summary: string;
+  keyActions: Array<{ label: string; url?: string; description?: string }>;
+  sections: Array<{
+    heading: string;
+    content: string;
+    simplifiedPoints: string[];
+  }>;
+  formFields?: Array<{
+    name: string;
+    label: string;
+    type: string;
+    required: boolean;
+    helpText?: string;
+  }>;
+  notices?: string[];
 }
 
 export interface ChatMessage {
@@ -71,92 +62,150 @@ export interface ChatMessage {
   content: string;
 }
 
-export async function chat(
-  messages: ChatMessage[],
-): Promise<string> {
-  const result = await callEdgeFunction({
-    action: 'chat',
-    messages,
+export async function chat(messages: ChatMessage[]): Promise<string> {
+  const response = await fetch('/api/ai/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages }),
   });
 
-  return result.reply;
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Chat request failed' }));
+    throw new Error(err.error || `Chat error (${response.status})`);
+  }
+
+  const data = await response.json();
+  return data.reply || '';
 }
 
-export async function simplifyText(
-  text: string,
-): Promise<string> {
-  const result = await callEdgeFunction({
-    action: 'simplifyText',
-    text,
+export async function simplifyText(text: string): Promise<string> {
+  const response = await fetch('/api/ai/simplify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
   });
 
-  return result.reply;
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Simplification failed' }));
+    throw new Error(err.error || `Simplification error (${response.status})`);
+  }
+
+  const data = await response.json();
+  return data.simplifiedText || text;
 }
 
 export async function translateText(
   text: string,
   targetLanguage: string,
+  simplify = false,
 ): Promise<string> {
-  const result = await callEdgeFunction({
-    action: 'translateText',
-    text,
-    targetLanguage,
+  const response = await fetch('/api/ai/translate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, targetLang: targetLanguage, simplify }),
   });
 
-  return result.reply;
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Translation failed' }));
+    throw new Error(err.error || `Translation error (${response.status})`);
+  }
+
+  const data = await response.json();
+  return data.translatedText || text;
+}
+
+export async function analyzeWebsite(url: string): Promise<WebsiteAnalysisResult> {
+  const response = await fetch('/api/ai/analyze-website', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Analysis failed' }));
+    throw new Error(err.error || `Analysis error (${response.status})`);
+  }
+
+  const data = await response.json();
+  return data.analysis as WebsiteAnalysisResult;
+}
+
+export async function transformAccessible(
+  url?: string,
+  rawText?: string,
+  preferences?: any,
+): Promise<AccessibleTransformResult> {
+  const response = await fetch('/api/ai/transform-accessible', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ url, rawText, preferences }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Transformation failed' }));
+    throw new Error(err.error || `Transformation error (${response.status})`);
+  }
+
+  const data = await response.json();
+  return data.data as AccessibleTransformResult;
+}
+
+export interface ProcessDocumentOptions {
+  text?: string;
+  fileData?: string;
+  mimeType?: string;
+  fileName?: string;
+}
+
+export async function processDocument(
+  input: string | ProcessDocumentOptions,
+  fileName?: string,
+): Promise<DocumentAnalysisResult> {
+  const payload =
+    typeof input === 'string'
+      ? { text: input, fileName }
+      : { ...input, fileName: input.fileName || fileName };
+
+  const response = await fetch('/api/ai/document', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Document processing failed' }));
+    throw new Error(err.error || `Document error (${response.status})`);
+  }
+
+  const data = await response.json();
+  return data.data as DocumentAnalysisResult;
+}
+
+export async function queryVoice(transcript: string, lang = 'en-IN'): Promise<string> {
+  const response = await fetch('/api/ai/voice', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transcript, lang }),
+  });
+
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({ error: 'Voice request failed' }));
+    throw new Error(err.error || `Voice error (${response.status})`);
+  }
+
+  const data = await response.json();
+  return data.reply || '';
+}
+
+export async function summarizeDocument(documentContent: string): Promise<string> {
+  const res = await processDocument(documentContent, 'Document');
+  return res.summary;
 }
 
 export async function analyzeAccessibilityIssues(
   url: string,
-  context?: string,
+  _context?: string,
 ): Promise<string> {
-  const result = await callEdgeFunction({
-    action: 'analyzeAccessibilityIssues',
-    url,
-    context,
-  });
-
-  return result.reply;
-}
-
-export async function analyzeWebsite(
-  url: string,
-): Promise<AccessibilityAnalysisResult> {
-  const { data: session } = await supabase.auth.getSession();
-
-  const response = await fetch(EDGE_FUNCTION_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${
-        session.session?.access_token ??
-        import.meta.env.VITE_SUPABASE_ANON_KEY
-      }`,
-    },
-    body: JSON.stringify({
-      action: 'analyzeWebsite',
-      url,
-    }),
-  });
-
-  const body = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(
-      body.error || 'Website analysis failed.',
-    );
-  }
-
-  return body.analysis as AccessibilityAnalysisResult;
-}
-
-export async function summarizeDocument(
-  documentContent: string,
-): Promise<string> {
-  const result = await callEdgeFunction({
-    action: 'summarizeDocument',
-    documentContent,
-  });
-
-  return result.reply;
+  const res = await analyzeWebsite(url);
+  return res.summary;
 }
