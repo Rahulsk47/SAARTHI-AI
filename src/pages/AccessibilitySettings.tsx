@@ -1,134 +1,231 @@
-import { useState } from "react";
+import { motion } from 'framer-motion';
 import {
-  Sparkles,
-  Play,
-  ArrowRight,
-  CheckCircle2,
-  Loader2,
-} from "lucide-react";
+  Settings2,
+  Type,
+  Contrast,
+  AlignLeft,
+  Wand2,
+  Maximize2,
+  ZapOff,
+  Languages,
+  RotateCcw,
+  Eye,
+} from 'lucide-react';
+import PageHeader from '@/components/PageHeader';
+import SectionCard from '@/components/SectionCard';
+import { useA11y, LANGUAGES } from '@/context/AccessibilityContext';
 
-export default function DemoPage() {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [completed, setCompleted] = useState(false);
-
-  const handleDemo = () => {
-    setIsProcessing(true);
-    setCompleted(false);
-
-    setTimeout(() => {
-      setIsProcessing(false);
-      setCompleted(true);
-    }, 2000);
-  };
+export default function AccessibilitySettings() {
+  const { settings, update, reset } = useA11y();
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
-      {/* Background */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.18),transparent_50%)]" />
+    <div className="px-6 py-8 md:px-10">
+      <PageHeader
+        title="Accessibility Center"
+        subtitle="Personalize SAARTHI AI. These controls change the entire application in real time."
+        icon={Settings2}
+        actions={
+          <button onClick={reset} className="btn-ghost text-sm">
+            <RotateCcw size={16} /> Reset to Defaults
+          </button>
+        }
+      />
 
-      {/* Floating particles */}
-      <div className="absolute left-[10%] top-[20%] h-3 w-3 animate-pulse rounded-full bg-blue-400 blur-sm" />
-      <div className="absolute right-[15%] top-[30%] h-4 w-4 animate-pulse rounded-full bg-purple-400 blur-sm" />
-      <div className="absolute bottom-[20%] left-[20%] h-2 w-2 animate-pulse rounded-full bg-cyan-400 blur-sm" />
-
-      <section className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 text-center">
-        {/* SAARTHI CORE */}
-        <div className="relative mb-10 flex h-48 w-48 items-center justify-center">
-          <div className="absolute h-48 w-48 animate-spin rounded-full border border-blue-400/30" />
-
-          <div className="absolute h-36 w-36 animate-pulse rounded-full border border-purple-400/40" />
-
-          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 via-purple-500 to-cyan-400 shadow-2xl shadow-blue-500/40">
-            {isProcessing ? (
-              <Loader2 className="h-10 w-10 animate-spin" />
-            ) : completed ? (
-              <CheckCircle2 className="h-10 w-10" />
-            ) : (
-              <Sparkles className="h-10 w-10" />
-            )}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Font Size */}
+        <SectionCard title="Font Size" icon={<Type size={18} />} delay={0}>
+          <div className="mb-3 text-sm text-slate-400">
+            Current scale: <span className="text-core-300 font-medium">{settings.fontScale}x</span>
           </div>
-        </div>
+          <input
+            type="range"
+            min={0.85}
+            max={1.6}
+            step={0.05}
+            value={settings.fontScale}
+            onChange={(e) => update('fontScale', parseFloat(e.target.value))}
+            className="w-full accent-core-500"
+            aria-label="Font size"
+          />
+          <div className="mt-3 flex items-center justify-between text-slate-500 text-xs">
+            <span>A</span>
+            <span style={{ fontSize: `${1.3 * settings.fontScale}rem` }} className="text-slate-300">A</span>
+            <span style={{ fontSize: `${1.6 * settings.fontScale}rem` }} className="text-slate-300">A</span>
+          </div>
+        </SectionCard>
 
-        {/* Badge */}
-        <div className="mb-6 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-blue-300 backdrop-blur">
-          SAARTHI AI • DEMO MODE
-        </div>
+        {/* High Contrast */}
+        <SectionCard title="High Contrast" icon={<Contrast size={18} />} delay={0.05}>
+          <ToggleRow
+            label="Enable high contrast mode"
+            desc="Maximizes text-background contrast for better readability."
+            checked={settings.highContrast}
+            onChange={(v) => update('highContrast', v)}
+          />
+        </SectionCard>
 
-        {/* Title */}
-        <h1 className="max-w-4xl text-5xl font-bold tracking-tight md:text-7xl">
-          THE INTERNET
-          <br />
-          <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-300 bg-clip-text text-transparent">
-            SHOULD ADAPT TO YOU.
-          </span>
-        </h1>
-
-        {/* Description */}
-        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate-400">
-          SAARTHI AI helps transform complex digital experiences into simpler,
-          smarter, multilingual, and more accessible experiences.
-        </p>
-
-        {/* Demo Result */}
-        {completed && (
-          <div className="mt-8 max-w-xl rounded-2xl border border-green-400/20 bg-green-400/10 p-5 backdrop-blur">
-            <div className="flex items-center justify-center gap-2 text-green-300">
-              <CheckCircle2 className="h-5 w-5" />
-              <span className="font-semibold">
-                SAARTHI AI Demo Completed Successfully
-              </span>
+        {/* Text Spacing */}
+        <SectionCard title="Text Spacing" icon={<AlignLeft size={18} />} delay={0.1}>
+          <div className="space-y-4">
+            <div>
+              <div className="mb-1.5 flex justify-between text-sm">
+                <span className="text-slate-400">Letter spacing</span>
+                <span className="text-core-300">{settings.letterSpacing}em</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={0.2}
+                step={0.01}
+                value={settings.letterSpacing}
+                onChange={(e) => update('letterSpacing', parseFloat(e.target.value))}
+                className="w-full accent-core-500"
+                aria-label="Letter spacing"
+              />
             </div>
-
-            <p className="mt-2 text-sm text-slate-300">
-              This feature is currently running with demo data. Real AI and
-              backend services can be connected in the next version.
-            </p>
+            <div>
+              <div className="mb-1.5 flex justify-between text-sm">
+                <span className="text-slate-400">Word spacing</span>
+                <span className="text-core-300">{settings.wordSpacing}em</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={0.5}
+                step={0.05}
+                value={settings.wordSpacing}
+                onChange={(e) => update('wordSpacing', parseFloat(e.target.value))}
+                className="w-full accent-core-500"
+                aria-label="Word spacing"
+              />
+            </div>
+            <div>
+              <div className="mb-1.5 flex justify-between text-sm">
+                <span className="text-slate-400">Line height</span>
+                <span className="text-core-300">{settings.lineHeight}</span>
+              </div>
+              <input
+                type="range"
+                min={1.3}
+                max={2.2}
+                step={0.1}
+                value={settings.lineHeight}
+                onChange={(e) => update('lineHeight', parseFloat(e.target.value))}
+                className="w-full accent-core-500"
+                aria-label="Line height"
+              />
+            </div>
           </div>
-        )}
+        </SectionCard>
 
-        {/* Button */}
-        <button
-          onClick={handleDemo}
-          disabled={isProcessing}
-          className="mt-8 flex items-center gap-3 rounded-xl bg-white px-6 py-4 font-semibold text-slate-950 transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isProcessing ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin" />
-              SAARTHI IS PROCESSING...
-            </>
-          ) : completed ? (
-            <>
-              RUN AGAIN
-              <Play className="h-5 w-5" />
-            </>
-          ) : (
-            <>
-              EXPERIENCE SAARTHI
-              <ArrowRight className="h-5 w-5" />
-            </>
+        {/* Simple Language */}
+        <SectionCard title="Simple Language" icon={<Wand2 size={18} />} delay={0.15}>
+          <ToggleRow
+            label="Use simple language by default"
+            desc="SAARTHI will prefer simplified summaries and plain language."
+            checked={settings.simpleLanguage}
+            onChange={(v) => update('simpleLanguage', v)}
+          />
+        </SectionCard>
+
+        {/* Large Controls */}
+        <SectionCard title="Large Controls" icon={<Maximize2 size={18} />} delay={0.2}>
+          <ToggleRow
+            label="Enlarge buttons and inputs"
+            desc="Makes all interactive elements larger and easier to tap."
+            checked={settings.largeControls}
+            onChange={(v) => update('largeControls', v)}
+          />
+        </SectionCard>
+
+        {/* Reduce Motion */}
+        <SectionCard title="Reduce Motion" icon={<ZapOff size={18} />} delay={0.25}>
+          <ToggleRow
+            label="Reduce animations and motion"
+            desc="Disables 3D animations, transitions, and floating effects."
+            checked={settings.reduceMotion}
+            onChange={(v) => update('reduceMotion', v)}
+          />
+          {settings.reduceMotion && (
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-warning-500/20 bg-warning-500/5 p-3 text-sm text-warning-400">
+              <Eye size={14} /> 3D Core animations are reduced. Static fallback is shown.
+            </div>
           )}
-        </button>
+        </SectionCard>
 
-        {/* Features */}
-        <div className="mt-14 grid max-w-4xl grid-cols-1 gap-4 md:grid-cols-3">
-          {[
-            ["WEBSITE", "Analyze accessibility and identify barriers."],
-            ["DOCUMENT", "Understand complex documents easily."],
-            ["AI ASSISTANT", "Get intelligent accessibility guidance."],
-          ].map(([title, text]) => (
-            <div
-              key={title}
-              className="rounded-2xl border border-white/10 bg-white/5 p-6 text-left backdrop-blur transition hover:-translate-y-1 hover:border-blue-400/40"
-            >
-              <h3 className="font-bold text-blue-300">{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-400">
-                {text}
-              </p>
+        {/* Preferred Language */}
+        <SectionCard title="Preferred Language" icon={<Languages size={18} />} delay={0.3} className="lg:col-span-2">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {LANGUAGES.map((l) => (
+              <button
+                key={l.code}
+                onClick={() => update('language', l.code)}
+                className={`rounded-xl border p-4 text-center transition ${
+                  settings.language === l.code
+                    ? 'border-core-400/40 bg-core-500/15'
+                    : 'border-white/5 bg-ink-900/40 hover:border-white/15'
+                }`}
+              >
+                <div className="font-display text-lg font-semibold text-white">{l.native}</div>
+                <div className="text-xs text-slate-500">{l.name}</div>
+              </button>
+            ))}
+          </div>
+        </SectionCard>
+      </div>
+
+      {/* Live preview */}
+      <div className="mt-8">
+        <SectionCard title="Live Preview" delay={0.35}>
+          <div className="rounded-xl border border-white/10 bg-ink-900/40 p-6">
+            <h3 className="font-display text-xl font-semibold text-white">National Merit Scholarship 2026</h3>
+            <p className="mt-2 text-slate-300">
+              This scholarship supports students from low-income families. You can apply online with
+              the required documents before the deadline.
+            </p>
+            <div className="mt-4 flex gap-3">
+              <button className="btn-primary">Apply Now</button>
+              <button className="btn-ghost">Learn More</button>
             </div>
-          ))}
-        </div>
-      </section>
-    </main>
+          </div>
+        </SectionCard>
+      </div>
+    </div>
+  );
+}
+
+function ToggleRow({
+  label,
+  desc,
+  checked,
+  onChange,
+}: {
+  label: string;
+  desc: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <div className="text-sm font-medium text-white">{label}</div>
+        <div className="text-xs text-slate-500 mt-0.5">{desc}</div>
+      </div>
+      <button
+        onClick={() => onChange(!checked)}
+        className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+          checked ? 'bg-core-500' : 'bg-white/10'
+        }`}
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+      >
+        <motion.div
+          layout
+          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+          className={`absolute top-1 h-5 w-5 rounded-full bg-white ${checked ? 'left-6' : 'left-1'}`}
+        />
+      </button>
+    </div>
   );
 }
