@@ -127,3 +127,12 @@ html[data-reduce-motion='1'] *::after {
   background: rgba(148, 163, 184, 0.35);
 }
 
+/* Shimmer text */
+.shimmer-text {
+  background: linear-gradient(90deg, #67e8f9 0%, #ffffff 50%, #67e8f9 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: shimmer 2.5s linear infinite;
+}
