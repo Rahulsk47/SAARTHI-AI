@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, MicOff, Volume2, Square, Send, Trash2 } from 'lucide-react';
+import { Mic, Volume2, Square, Send, Trash2 } from 'lucide-react';
 import SaarthiCore from '@/components/SaarthiCore';
 import PageHeader from '@/components/PageHeader';
 import { type CoreState } from '@/types/core';
@@ -38,7 +38,7 @@ export default function VoiceAssistant() {
   ]);
   const [textInput, setTextInput] = useState('');
   const [waveform, setWaveform] = useState<number[]>(new Array(32).fill(0.1));
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<unknown>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -61,7 +61,8 @@ export default function VoiceAssistant() {
     setListening(true);
     setCoreState('listening');
 
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SR = (window as unknown as { SpeechRecognition?: new () => unknown; webkitSpeechRecognition?: new () => unknown }).SpeechRecognition ||
+      (window as unknown as { webkitSpeechRecognition?: new () => unknown }).webkitSpeechRecognition;
     if (SR) {
       const recognition = new SR();
       recognitionRef.current = recognition;
@@ -70,7 +71,7 @@ export default function VoiceAssistant() {
       recognition.lang = 'en-US';
 
       let finalText = '';
-      recognition.onresult = (event: any) => {
+      recognition.onresult = (event: { resultIndex: number; results: { isFinal: boolean; [0]: { transcript: string } }[] }) => {
         for (let i = event.resultIndex; i < event.results.length; i++) {
           if (event.results[i].isFinal) {
             finalText += event.results[i][0].transcript;
