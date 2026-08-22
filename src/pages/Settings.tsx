@@ -1,134 +1,122 @@
-import { useState } from "react";
-import {
-  Sparkles,
-  Play,
-  ArrowRight,
-  CheckCircle2,
-  Loader2,
-} from "lucide-react";
+import { Cog, Bell, Shield, Palette, Globe, Save } from 'lucide-react';
+import PageHeader from '@/components/PageHeader';
+import SectionCard from '@/components/SectionCard';
+import { useState } from 'react';
 
-export default function DemoPage() {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [completed, setCompleted] = useState(false);
-
-  const handleDemo = () => {
-    setIsProcessing(true);
-    setCompleted(false);
-
-    setTimeout(() => {
-      setIsProcessing(false);
-      setCompleted(true);
-    }, 2000);
-  };
+export default function Settings() {
+  const [notifications, setNotifications] = useState(true);
+  const [autoAnalyze, setAutoAnalyze] = useState(false);
+  const [theme, setTheme] = useState('dark');
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
-      {/* Background */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.18),transparent_50%)]" />
+    <div className="px-6 py-8 md:px-10">
+      <PageHeader title="Settings" subtitle="Application preferences and account configuration." icon={Cog} />
 
-      {/* Floating particles */}
-      <div className="absolute left-[10%] top-[20%] h-3 w-3 animate-pulse rounded-full bg-blue-400 blur-sm" />
-      <div className="absolute right-[15%] top-[30%] h-4 w-4 animate-pulse rounded-full bg-purple-400 blur-sm" />
-      <div className="absolute bottom-[20%] left-[20%] h-2 w-2 animate-pulse rounded-full bg-cyan-400 blur-sm" />
-
-      <section className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 text-center">
-        {/* SAARTHI CORE */}
-        <div className="relative mb-10 flex h-48 w-48 items-center justify-center">
-          <div className="absolute h-48 w-48 animate-spin rounded-full border border-blue-400/30" />
-
-          <div className="absolute h-36 w-36 animate-pulse rounded-full border border-purple-400/40" />
-
-          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 via-purple-500 to-cyan-400 shadow-2xl shadow-blue-500/40">
-            {isProcessing ? (
-              <Loader2 className="h-10 w-10 animate-spin" />
-            ) : completed ? (
-              <CheckCircle2 className="h-10 w-10" />
-            ) : (
-              <Sparkles className="h-10 w-10" />
-            )}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <SectionCard title="Notifications" icon={<Bell size={18} />} delay={0}>
+          <div className="space-y-4">
+            <ToggleRow
+              label="Email notifications"
+              desc="Receive updates about your analyses and reports."
+              checked={notifications}
+              onChange={setNotifications}
+            />
+            <ToggleRow
+              label="Auto-analyze visited URLs"
+              desc="Automatically run accessibility checks on URLs you enter."
+              checked={autoAnalyze}
+              onChange={setAutoAnalyze}
+            />
           </div>
-        </div>
+        </SectionCard>
 
-        {/* Badge */}
-        <div className="mb-6 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-blue-300 backdrop-blur">
-          SAARTHI AI • DEMO MODE
-        </div>
-
-        {/* Title */}
-        <h1 className="max-w-4xl text-5xl font-bold tracking-tight md:text-7xl">
-          THE INTERNET
-          <br />
-          <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-300 bg-clip-text text-transparent">
-            SHOULD ADAPT TO YOU.
-          </span>
-        </h1>
-
-        {/* Description */}
-        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate-400">
-          SAARTHI AI helps transform complex digital experiences into simpler,
-          smarter, multilingual, and more accessible experiences.
-        </p>
-
-        {/* Demo Result */}
-        {completed && (
-          <div className="mt-8 max-w-xl rounded-2xl border border-green-400/20 bg-green-400/10 p-5 backdrop-blur">
-            <div className="flex items-center justify-center gap-2 text-green-300">
-              <CheckCircle2 className="h-5 w-5" />
-              <span className="font-semibold">
-                SAARTHI AI Demo Completed Successfully
-              </span>
+        <SectionCard title="Appearance" icon={<Palette size={18} />} delay={0.05}>
+          <div className="space-y-3">
+            <div className="text-sm text-slate-400">Theme</div>
+            <div className="grid grid-cols-3 gap-2">
+              {['dark', 'midnight', 'system'].map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTheme(t)}
+                  className={`rounded-xl border p-3 text-sm capitalize transition ${
+                    theme === t ? 'border-core-400/40 bg-core-500/15 text-core-200' : 'border-white/5 text-slate-400 hover:border-white/15'
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
             </div>
-
-            <p className="mt-2 text-sm text-slate-300">
-              This feature is currently running with demo data. Real AI and
-              backend services can be connected in the next version.
-            </p>
+            <p className="text-xs text-slate-500 mt-2">Dark futuristic theme is the default and recommended experience.</p>
           </div>
-        )}
+        </SectionCard>
 
-        {/* Button */}
-        <button
-          onClick={handleDemo}
-          disabled={isProcessing}
-          className="mt-8 flex items-center gap-3 rounded-xl bg-white px-6 py-4 font-semibold text-slate-950 transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isProcessing ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin" />
-              SAARTHI IS PROCESSING...
-            </>
-          ) : completed ? (
-            <>
-              RUN AGAIN
-              <Play className="h-5 w-5" />
-            </>
-          ) : (
-            <>
-              EXPERIENCE SAARTHI
-              <ArrowRight className="h-5 w-5" />
-            </>
-          )}
+        <SectionCard title="Privacy" icon={<Shield size={18} />} delay={0.1}>
+          <div className="space-y-3 text-sm text-slate-400">
+            <p>Your data is stored locally in this demo build. When connected to Supabase, analyses and documents are saved to your account.</p>
+            <div className="flex items-center gap-2 rounded-xl border border-white/5 bg-ink-900/40 p-3">
+              <Shield size={16} className="text-success-400" />
+              <span>No data leaves your device in demo mode.</span>
+            </div>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Region & Language" icon={<Globe size={18} />} delay={0.15}>
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500">Default analysis language</label>
+              <select className="input" aria-label="Default language">
+                <option>English</option>
+                <option>Hindi</option>
+                <option>Tamil</option>
+                <option>Kannada</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500">Timezone</label>
+              <select className="input" aria-label="Timezone">
+                <option>India Standard Time (IST)</option>
+                <option>UTC</option>
+              </select>
+            </div>
+          </div>
+        </SectionCard>
+      </div>
+
+      <div className="mt-6 flex justify-end">
+        <button className="btn-primary">
+          <Save size={16} /> Save Changes
         </button>
+      </div>
+    </div>
+  );
+}
 
-        {/* Features */}
-        <div className="mt-14 grid max-w-4xl grid-cols-1 gap-4 md:grid-cols-3">
-          {[
-            ["WEBSITE", "Analyze accessibility and identify barriers."],
-            ["DOCUMENT", "Understand complex documents easily."],
-            ["AI ASSISTANT", "Get intelligent accessibility guidance."],
-          ].map(([title, text]) => (
-            <div
-              key={title}
-              className="rounded-2xl border border-white/10 bg-white/5 p-6 text-left backdrop-blur transition hover:-translate-y-1 hover:border-blue-400/40"
-            >
-              <h3 className="font-bold text-blue-300">{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-400">
-                {text}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-    </main>
+function ToggleRow({
+  label,
+  desc,
+  checked,
+  onChange,
+}: {
+  label: string;
+  desc: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div>
+        <div className="text-sm font-medium text-white">{label}</div>
+        <div className="text-xs text-slate-500 mt-0.5">{desc}</div>
+      </div>
+      <button
+        onClick={() => onChange(!checked)}
+        className={`relative h-7 w-12 shrink-0 rounded-full transition ${checked ? 'bg-core-500' : 'bg-white/10'}`}
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+      >
+        <div className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-all ${checked ? 'left-6' : 'left-1'}`} />
+      </button>
+    </div>
   );
 }
