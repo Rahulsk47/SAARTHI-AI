@@ -1,134 +1,227 @@
-import { useState } from "react";
-import {
-  Sparkles,
-  Play,
-  ArrowRight,
-  CheckCircle2,
-  Loader2,
-} from "lucide-react";
+import { useMemo, useRef, Suspense } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { Float, Stars } from '@react-three/drei';
+import * as THREE from 'three';
+import { CORE_STATE_META, type CoreState } from '@/types/core';
 
-export default function DemoPage() {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [completed, setCompleted] = useState(false);
+interface CoreProps {
+  state?: CoreState;
+  size?: number;
+  interactive?: boolean;
+  showStars?: boolean;
+}
 
-  const handleDemo = () => {
-    setIsProcessing(true);
-    setCompleted(false);
+function CoreSphere({ state, interactive }: { state: CoreState; interactive: boolean }) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const innerRef = useRef<THREE.Mesh>(null);
+  const meta = CORE_STATE_META[state];
 
-    setTimeout(() => {
-      setIsProcessing(false);
-      setCompleted(true);
-    }, 2000);
-  };
+  const color = new THREE.Color(meta.color);
+
+  useFrame((state, delta) => {
+    const t = state.clock.elapsedTime;
+    if (meshRef.current) {
+      meshRef.current.rotation.y += delta * 0.3;
+      meshRef.current.rotation.x = Math.sin(t * 0.4) * 0.15;
+      const scalePulse = 1 + Math.sin(t * 1.5) * 0.03;
+      meshRef.current.scale.setScalar(scalePulse);
+    }
+    if (innerRef.current) {
+      innerRef.current.rotation.y -= delta * 0.6;
+      innerRef.current.rotation.z += delta * 0.2;
+    }
+  });
+
+  const speed = state === 'idle' ? 1 : 2.5;
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
-      {/* Background */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.18),transparent_50%)]" />
+    <group>
+      <Float speed={speed} rotationIntensity={interactive ? 0.5 : 0.3} floatIntensity={0.6}>
+        {/* Outer wireframe sphere */}
+        <mesh ref={meshRef}>
+          <icosahedronGeometry args={[1.4, 2]} />
+          <meshStandardMaterial
+            color={color}
+            emissive={color}
+            emissiveIntensity={0.6}
+            wireframe
+            transparent
+            opacity={0.5}
+          />
+        </mesh>
 
-      {/* Floating particles */}
-      <div className="absolute left-[10%] top-[20%] h-3 w-3 animate-pulse rounded-full bg-blue-400 blur-sm" />
-      <div className="absolute right-[15%] top-[30%] h-4 w-4 animate-pulse rounded-full bg-purple-400 blur-sm" />
-      <div className="absolute bottom-[20%] left-[20%] h-2 w-2 animate-pulse rounded-full bg-cyan-400 blur-sm" />
+        {/* Inner solid core */}
+        <mesh ref={innerRef} scale={0.85}>
+          <icosahedronGeometry args={[1.4, 1]} />
+          <meshStandardMaterial
+            color={color}
+            emissive={color}
+            emissiveIntensity={0.9}
+            roughness={0.2}
+            metalness={0.8}
+            transparent
+            opacity={0.35}
+          />
+        </mesh>
 
-      <section className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 text-center">
-        {/* SAARTHI CORE */}
-        <div className="relative mb-10 flex h-48 w-48 items-center justify-center">
-          <div className="absolute h-48 w-48 animate-spin rounded-full border border-blue-400/30" />
+        {/* Glow halo */}
+        <mesh scale={1.7}>
+          <sphereGeometry args={[1.4, 32, 32]} />
+          <meshBasicMaterial color={color} transparent opacity={0.06} side={THREE.BackSide} />
+        </mesh>
+      </Float>
+    </group>
+  );
+}
 
-          <div className="absolute h-36 w-36 animate-pulse rounded-full border border-purple-400/40" />
+function OrbitRing({
+  radius,
+  tilt,
+  color,
+  speed,
+  particles,
+}: {
+  radius: number;
+  tilt: [number, number, number];
+  color: string;
+  speed: number;
+  particles: number;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
 
-          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 via-purple-500 to-cyan-400 shadow-2xl shadow-blue-500/40">
-            {isProcessing ? (
-              <Loader2 className="h-10 w-10 animate-spin" />
-            ) : completed ? (
-              <CheckCircle2 className="h-10 w-10" />
-            ) : (
-              <Sparkles className="h-10 w-10" />
-            )}
-          </div>
-        </div>
+  const particlePositions = useMemo(() => {
+    const arr: THREE.Vector3[] = [];
+    for (let i = 0; i < particles; i++) {
+      const angle = (i / particles) * Math.PI * 2;
+      arr.push(
+        new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius),
+      );
+    }
+    return arr;
+  }, [radius, particles]);
 
-        {/* Badge */}
-        <div className="mb-6 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-blue-300 backdrop-blur">
-          SAARTHI AI • DEMO MODE
-        </div>
+  useFrame((_, delta) => {
+    if (groupRef.current) groupRef.current.rotation.z += delta * speed;
+  });
 
-        {/* Title */}
-        <h1 className="max-w-4xl text-5xl font-bold tracking-tight md:text-7xl">
-          THE INTERNET
-          <br />
-          <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-300 bg-clip-text text-transparent">
-            SHOULD ADAPT TO YOU.
-          </span>
-        </h1>
+  return (
+    <group rotation={tilt}>
+      <group ref={groupRef}>
+        {/* Ring line */}
+        <mesh>
+          <torusGeometry args={[radius, 0.008, 8, 100]} />
+          <meshBasicMaterial color={color} transparent opacity={0.4} />
+        </mesh>
+        {/* Orbiting particles */}
+        {particlePositions.map((p, i) => (
+          <mesh key={i} position={p}>
+            <sphereGeometry args={[0.03, 8, 8]} />
+            <meshBasicMaterial color={color} />
+          </mesh>
+        ))}
+      </group>
+    </group>
+  );
+}
 
-        {/* Description */}
-        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate-400">
-          SAARTHI AI helps transform complex digital experiences into simpler,
-          smarter, multilingual, and more accessible experiences.
-        </p>
+function NeuralConnections({ state }: { state: CoreState }) {
+  const meta = CORE_STATE_META[state];
+  const color = new THREE.Color(meta.color);
+  const ref = useRef<THREE.LineSegments>(null);
 
-        {/* Demo Result */}
-        {completed && (
-          <div className="mt-8 max-w-xl rounded-2xl border border-green-400/20 bg-green-400/10 p-5 backdrop-blur">
-            <div className="flex items-center justify-center gap-2 text-green-300">
-              <CheckCircle2 className="h-5 w-5" />
-              <span className="font-semibold">
-                SAARTHI AI Demo Completed Successfully
-              </span>
-            </div>
+  const { positions, linePositions } = useMemo(() => {
+    const pts: THREE.Vector3[] = [];
+    const lines: number[] = [];
+    const count = 14;
+    for (let i = 0; i < count; i++) {
+      const phi = Math.acos(1 - (2 * (i + 0.5)) / count);
+      const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+      const r = 1.55;
+      pts.push(
+        new THREE.Vector3(
+          r * Math.cos(theta) * Math.sin(phi),
+          r * Math.sin(theta) * Math.sin(phi),
+          r * Math.cos(phi),
+        ),
+      );
+    }
+    for (let i = 0; i < count; i++) {
+      for (let j = i + 1; j < count; j++) {
+        if (pts[i].distanceTo(pts[j]) < 2.1) {
+          lines.push(pts[i].x, pts[i].y, pts[i].z, pts[j].x, pts[j].y, pts[j].z);
+        }
+      }
+    }
+    return { positions: pts, linePositions: Float32Array.from(lines) };
+  }, []);
 
-            <p className="mt-2 text-sm text-slate-300">
-              This feature is currently running with demo data. Real AI and
-              backend services can be connected in the next version.
-            </p>
-          </div>
-        )}
+  useFrame((_, delta) => {
+    if (ref.current) ref.current.rotation.y += delta * 0.15;
+  });
 
-        {/* Button */}
-        <button
-          onClick={handleDemo}
-          disabled={isProcessing}
-          className="mt-8 flex items-center gap-3 rounded-xl bg-white px-6 py-4 font-semibold text-slate-950 transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isProcessing ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin" />
-              SAARTHI IS PROCESSING...
-            </>
-          ) : completed ? (
-            <>
-              RUN AGAIN
-              <Play className="h-5 w-5" />
-            </>
-          ) : (
-            <>
-              EXPERIENCE SAARTHI
-              <ArrowRight className="h-5 w-5" />
-            </>
-          )}
-        </button>
+  const geo = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+    return g;
+  }, [linePositions]);
 
-        {/* Features */}
-        <div className="mt-14 grid max-w-4xl grid-cols-1 gap-4 md:grid-cols-3">
-          {[
-            ["WEBSITE", "Analyze accessibility and identify barriers."],
-            ["DOCUMENT", "Understand complex documents easily."],
-            ["AI ASSISTANT", "Get intelligent accessibility guidance."],
-          ].map(([title, text]) => (
-            <div
-              key={title}
-              className="rounded-2xl border border-white/10 bg-white/5 p-6 text-left backdrop-blur transition hover:-translate-y-1 hover:border-blue-400/40"
-            >
-              <h3 className="font-bold text-blue-300">{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-400">
-                {text}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-    </main>
+  return (
+    <group ref={ref as unknown as React.RefObject<THREE.Group>}>
+      <lineSegments geometry={geo}>
+        <lineBasicMaterial color={color} transparent opacity={0.25} />
+      </lineSegments>
+      {positions.map((p, i) => (
+        <mesh key={i} position={p}>
+          <sphereGeometry args={[0.04, 8, 8]} />
+          <meshBasicMaterial color={color} />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+function Scene({ state, interactive, showStars }: { state: CoreState; interactive: boolean; showStars: boolean }) {
+  const meta = CORE_STATE_META[state];
+
+  return (
+    <>
+      <ambientLight intensity={0.4} />
+      <pointLight position={[5, 5, 5]} intensity={1} color={meta.color} />
+      <pointLight position={[-5, -3, -5]} intensity={0.6} color={meta.color} />
+      <CoreSphere state={state} interactive={interactive} />
+      <NeuralConnections state={state} />
+      <OrbitRing radius={2.2} tilt={[Math.PI / 3, 0, 0]} color={meta.color} speed={0.4} particles={8} />
+      <OrbitRing radius={2.6} tilt={[Math.PI / 2.5, Math.PI / 4, 0]} color={meta.color} speed={-0.3} particles={6} />
+      <OrbitRing radius={3.0} tilt={[Math.PI / 2, 0, Math.PI / 6]} color={meta.color} speed={0.2} particles={5} />
+      {showStars && (
+        <Stars radius={50} depth={30} count={1200} factor={3} saturation={0} fade speed={0.5} />
+      )}
+    </>
+  );
+}
+
+export default function SaarthiCore({
+  state = 'idle',
+  size = 320,
+  interactive = true,
+  showStars = true,
+}: CoreProps) {
+  return (
+    <div
+      style={{ width: size, height: size }}
+      className="relative"
+      role="img"
+      aria-label={`SAARTHI Core in ${state} state`}
+    >
+      <Canvas
+        camera={{ position: [0, 0, 7], fov: 45 }}
+        dpr={[1, 2]}
+        gl={{ antialias: true, alpha: true }}
+      >
+        <Suspense fallback={null}>
+          <Scene state={state} interactive={interactive} showStars={showStars} />
+        </Suspense>
+      </Canvas>
+    </div>
   );
 }
