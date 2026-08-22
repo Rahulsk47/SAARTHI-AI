@@ -1,134 +1,195 @@
-import { useState } from "react";
-import {
-  Sparkles,
-  Play,
-  ArrowRight,
-  CheckCircle2,
-  Loader2,
-} from "lucide-react";
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Languages, Wand2, Volume2, Copy, Check, ArrowRight, ArrowLeftRight } from 'lucide-react';
+import SaarthiCore from '@/components/SaarthiCore';
+import PageHeader from '@/components/PageHeader';
+import SectionCard from '@/components/SectionCard';
+import { LANGUAGES, type LanguageCode } from '@/context/AccessibilityContext';
+import { TRANSLATIONS } from '@/data/demoData';
+import { type CoreState } from '@/types/core';
 
-export default function DemoPage() {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [completed, setCompleted] = useState(false);
+type Mode = 'translate' | 'simplify' | 'both';
 
-  const handleDemo = () => {
-    setIsProcessing(true);
-    setCompleted(false);
+const SAMPLE_TEXT = TRANSLATIONS.ration.original;
+const SIMPLIFIED_TEXT = TRANSLATIONS.ration.simplified;
+const TRANSLATED: Record<string, string> = TRANSLATIONS.ration.languages;
 
+export default function LanguageAssistant() {
+  const [mode, setMode] = useState<Mode>('translate');
+  const [sourceLang, setSourceLang] = useState<LanguageCode>('en');
+  const [targetLang, setTargetLang] = useState<LanguageCode>('hi');
+  const [coreState, setCoreState] = useState<CoreState>('idle');
+  const [output, setOutput] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  const runProcess = () => {
+    setCoreState('processing');
+    setTimeout(() => setCoreState('analyzing'), 600);
     setTimeout(() => {
-      setIsProcessing(false);
-      setCompleted(true);
-    }, 2000);
+      let result = '';
+      if (mode === 'simplify') {
+        result = SIMPLIFIED_TEXT;
+      } else if (mode === 'translate') {
+        result = targetLang === 'en' ? SAMPLE_TEXT : (TRANSLATED[targetLang] ?? SIMPLIFIED_TEXT);
+      } else {
+        // both
+        result = targetLang === 'en' ? SIMPLIFIED_TEXT : (TRANSLATED[targetLang] ?? SIMPLIFIED_TEXT);
+      }
+      setOutput(result);
+      setCoreState('success');
+    }, 1600);
+  };
+
+  const speakOutput = () => {
+    if ('speechSynthesis' in window && output) {
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(output);
+      utter.lang = targetLang === 'en' ? 'en-US' : `${targetLang}-IN`;
+      window.speechSynthesis.speak(utter);
+    }
+  };
+
+  const copyOutput = () => {
+    navigator.clipboard.writeText(output);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const swapLangs = () => {
+    setSourceLang(targetLang);
+    setTargetLang(sourceLang);
   };
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
-      {/* Background */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.18),transparent_50%)]" />
+    <div className="px-6 py-8 md:px-10">
+      <PageHeader
+        title="Language Assistant"
+        subtitle="Translate and simplify text across 8 Indian languages."
+        icon={Languages}
+      />
 
-      {/* Floating particles */}
-      <div className="absolute left-[10%] top-[20%] h-3 w-3 animate-pulse rounded-full bg-blue-400 blur-sm" />
-      <div className="absolute right-[15%] top-[30%] h-4 w-4 animate-pulse rounded-full bg-purple-400 blur-sm" />
-      <div className="absolute bottom-[20%] left-[20%] h-2 w-2 animate-pulse rounded-full bg-cyan-400 blur-sm" />
+      {/* Mode selector */}
+      <div className="mb-6 flex flex-wrap gap-2">
+        {([
+          { key: 'translate', label: 'Translate', icon: ArrowRight },
+          { key: 'simplify', label: 'Simplify', icon: Wand2 },
+          { key: 'both', label: 'Translate + Simplify', icon: ArrowLeftRight },
+        ] as { key: Mode; label: string; icon: typeof ArrowRight }[]).map((m) => (
+          <button
+            key={m.key}
+            onClick={() => setMode(m.key)}
+            className={`btn ${mode === m.key ? 'btn-primary' : 'btn-ghost'}`}
+          >
+            <m.icon size={16} /> {m.label}
+          </button>
+        ))}
+      </div>
 
-      <section className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 text-center">
-        {/* SAARTHI CORE */}
-        <div className="relative mb-10 flex h-48 w-48 items-center justify-center">
-          <div className="absolute h-48 w-48 animate-spin rounded-full border border-blue-400/30" />
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Left: Core + language pickers */}
+        <div className="space-y-4 lg:sticky lg:top-8 lg:self-start">
+          <SectionCard className="flex flex-col items-center" delay={0}>
+            <SaarthiCore state={coreState} size={180} showStars={false} />
+          </SectionCard>
 
-          <div className="absolute h-36 w-36 animate-pulse rounded-full border border-purple-400/40" />
-
-          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 via-purple-500 to-cyan-400 shadow-2xl shadow-blue-500/40">
-            {isProcessing ? (
-              <Loader2 className="h-10 w-10 animate-spin" />
-            ) : completed ? (
-              <CheckCircle2 className="h-10 w-10" />
-            ) : (
-              <Sparkles className="h-10 w-10" />
-            )}
-          </div>
-        </div>
-
-        {/* Badge */}
-        <div className="mb-6 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-blue-300 backdrop-blur">
-          SAARTHI AI • DEMO MODE
-        </div>
-
-        {/* Title */}
-        <h1 className="max-w-4xl text-5xl font-bold tracking-tight md:text-7xl">
-          THE INTERNET
-          <br />
-          <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-300 bg-clip-text text-transparent">
-            SHOULD ADAPT TO YOU.
-          </span>
-        </h1>
-
-        {/* Description */}
-        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate-400">
-          SAARTHI AI helps transform complex digital experiences into simpler,
-          smarter, multilingual, and more accessible experiences.
-        </p>
-
-        {/* Demo Result */}
-        {completed && (
-          <div className="mt-8 max-w-xl rounded-2xl border border-green-400/20 bg-green-400/10 p-5 backdrop-blur">
-            <div className="flex items-center justify-center gap-2 text-green-300">
-              <CheckCircle2 className="h-5 w-5" />
-              <span className="font-semibold">
-                SAARTHI AI Demo Completed Successfully
-              </span>
-            </div>
-
-            <p className="mt-2 text-sm text-slate-300">
-              This feature is currently running with demo data. Real AI and
-              backend services can be connected in the next version.
-            </p>
-          </div>
-        )}
-
-        {/* Button */}
-        <button
-          onClick={handleDemo}
-          disabled={isProcessing}
-          className="mt-8 flex items-center gap-3 rounded-xl bg-white px-6 py-4 font-semibold text-slate-950 transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isProcessing ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin" />
-              SAARTHI IS PROCESSING...
-            </>
-          ) : completed ? (
-            <>
-              RUN AGAIN
-              <Play className="h-5 w-5" />
-            </>
-          ) : (
-            <>
-              EXPERIENCE SAARTHI
-              <ArrowRight className="h-5 w-5" />
-            </>
+          {mode !== 'simplify' && (
+            <SectionCard title="Languages" delay={0.1}>
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500">From</label>
+                  <select
+                    value={sourceLang}
+                    onChange={(e) => setSourceLang(e.target.value as LanguageCode)}
+                    className="input"
+                    aria-label="Source language"
+                  >
+                    {LANGUAGES.map((l) => (
+                      <option key={l.code} value={l.code}>{l.name} ({l.native})</option>
+                    ))}
+                  </select>
+                </div>
+                <button onClick={swapLangs} className="mx-auto flex text-slate-500 hover:text-core-300 transition" aria-label="Swap languages">
+                  <ArrowLeftRight size={16} />
+                </button>
+                <div>
+                  <label className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-500">To</label>
+                  <select
+                    value={targetLang}
+                    onChange={(e) => setTargetLang(e.target.value as LanguageCode)}
+                    className="input"
+                    aria-label="Target language"
+                  >
+                    {LANGUAGES.map((l) => (
+                      <option key={l.code} value={l.code}>{l.name} ({l.native})</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </SectionCard>
           )}
-        </button>
-
-        {/* Features */}
-        <div className="mt-14 grid max-w-4xl grid-cols-1 gap-4 md:grid-cols-3">
-          {[
-            ["WEBSITE", "Analyze accessibility and identify barriers."],
-            ["DOCUMENT", "Understand complex documents easily."],
-            ["AI ASSISTANT", "Get intelligent accessibility guidance."],
-          ].map(([title, text]) => (
-            <div
-              key={title}
-              className="rounded-2xl border border-white/10 bg-white/5 p-6 text-left backdrop-blur transition hover:-translate-y-1 hover:border-blue-400/40"
-            >
-              <h3 className="font-bold text-blue-300">{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-400">
-                {text}
-              </p>
-            </div>
-          ))}
         </div>
-      </section>
-    </main>
+
+        {/* Right: input + output */}
+        <div className="lg:col-span-2 space-y-6">
+          <SectionCard title="Input Text" delay={0}>
+            <textarea
+              defaultValue={SAMPLE_TEXT}
+              className="input min-h-[140px] resize-y"
+              aria-label="Input text to process"
+            />
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-xs text-slate-500">Sample: Ration card application text (demo)</span>
+              <button onClick={runProcess} className="btn-primary">
+                <Wand2 size={16} /> {mode === 'simplify' ? 'Simplify' : 'Process'}
+              </button>
+            </div>
+          </SectionCard>
+
+          <AnimatePresence>
+            {output && (
+              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                <SectionCard title="Output" delay={0}>
+                  <div className="rounded-xl border border-white/10 bg-ink-900/40 p-4">
+                    <div className="mb-2 flex items-center gap-2 text-xs text-slate-500">
+                      {mode === 'simplify' && <><Wand2 size={12} /> Simplified English</>}
+                      {mode === 'translate' && <><Languages size={12} /> {LANGUAGES.find((l) => l.code === targetLang)?.name}</>}
+                      {mode === 'both' && <><Wand2 size={12} /> Simplified · <Languages size={12} /> {LANGUAGES.find((l) => l.code === targetLang)?.name}</>}
+                    </div>
+                    <p className="text-sm leading-relaxed text-slate-200">{output}</p>
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button onClick={speakOutput} className="btn-ghost text-sm">
+                      <Volume2 size={16} /> Read Aloud
+                    </button>
+                    <button onClick={copyOutput} className="btn-ghost text-sm">
+                      {copied ? <><Check size={16} /> Copied</> : <><Copy size={16} /> Copy</>}
+                    </button>
+                  </div>
+                </SectionCard>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Language grid */}
+          <SectionCard title="Supported Languages" icon={<Languages size={18} />} delay={0.1}>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              {LANGUAGES.map((l) => (
+                <div
+                  key={l.code}
+                  className={`rounded-xl border p-3 text-center transition ${
+                    targetLang === l.code && mode !== 'simplify'
+                      ? 'border-core-400/40 bg-core-500/10'
+                      : 'border-white/5 bg-ink-900/40'
+                  }`}
+                >
+                  <div className="font-display text-lg font-semibold text-white">{l.native}</div>
+                  <div className="text-xs text-slate-500">{l.name}</div>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
+        </div>
+      </div>
+    </div>
   );
 }
