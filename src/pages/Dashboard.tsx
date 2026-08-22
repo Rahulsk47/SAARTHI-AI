@@ -1,134 +1,171 @@
-import { useState } from "react";
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
+  Globe,
+  FileText,
+  Mic,
+  Languages,
   Sparkles,
-  Play,
+  Settings2,
   ArrowRight,
+  TrendingUp,
+  Clock,
   CheckCircle2,
-  Loader2,
-} from "lucide-react";
+  AlertTriangle,
+} from 'lucide-react';
+import SaarthiCore from '@/components/SaarthiCore';
+import SectionCard from '@/components/SectionCard';
+import { DEMO_HISTORY } from '@/data/demoData';
 
-export default function DemoPage() {
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [completed, setCompleted] = useState(false);
+const QUICK_ACTIONS = [
+  { icon: Globe, title: 'Analyze Website', desc: 'Check any URL for accessibility', to: '/analyzer', color: 'text-core-300' },
+  { icon: FileText, title: 'Document AI', desc: 'Simplify & translate documents', to: '/document-ai', color: 'text-accent-400' },
+  { icon: Mic, title: 'Voice Assistant', desc: 'Ask questions by voice', to: '/voice', color: 'text-core-300' },
+  { icon: Languages, title: 'Language Assistant', desc: 'Translate across 8 languages', to: '/language', color: 'text-accent-400' },
+  { icon: Sparkles, title: 'Accessible View', desc: 'Transform complex sites', to: '/accessible-view', color: 'text-core-300' },
+  { icon: Settings2, title: 'Accessibility', desc: 'Personalize your experience', to: '/accessibility', color: 'text-accent-400' },
+];
 
-  const handleDemo = () => {
-    setIsProcessing(true);
-    setCompleted(false);
-
-    setTimeout(() => {
-      setIsProcessing(false);
-      setCompleted(true);
-    }, 2000);
-  };
-
+export default function Dashboard() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
-      {/* Background */}
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.18),transparent_50%)]" />
+    <div className="px-6 py-8 md:px-10">
+      {/* Header */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mb-8"
+      >
+        <h1 className="font-display text-3xl font-bold text-white">Welcome back</h1>
+        <p className="text-muted mt-1">Your AI accessibility command center.</p>
+      </motion.div>
 
-      {/* Floating particles */}
-      <div className="absolute left-[10%] top-[20%] h-3 w-3 animate-pulse rounded-full bg-blue-400 blur-sm" />
-      <div className="absolute right-[15%] top-[30%] h-4 w-4 animate-pulse rounded-full bg-purple-400 blur-sm" />
-      <div className="absolute bottom-[20%] left-[20%] h-2 w-2 animate-pulse rounded-full bg-cyan-400 blur-sm" />
-
-      <section className="relative z-10 flex min-h-screen flex-col items-center justify-center px-6 text-center">
-        {/* SAARTHI CORE */}
-        <div className="relative mb-10 flex h-48 w-48 items-center justify-center">
-          <div className="absolute h-48 w-48 animate-spin rounded-full border border-blue-400/30" />
-
-          <div className="absolute h-36 w-36 animate-pulse rounded-full border border-purple-400/40" />
-
-          <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 via-purple-500 to-cyan-400 shadow-2xl shadow-blue-500/40">
-            {isProcessing ? (
-              <Loader2 className="h-10 w-10 animate-spin" />
-            ) : completed ? (
-              <CheckCircle2 className="h-10 w-10" />
-            ) : (
-              <Sparkles className="h-10 w-10" />
-            )}
-          </div>
-        </div>
-
-        {/* Badge */}
-        <div className="mb-6 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-blue-300 backdrop-blur">
-          SAARTHI AI • DEMO MODE
-        </div>
-
-        {/* Title */}
-        <h1 className="max-w-4xl text-5xl font-bold tracking-tight md:text-7xl">
-          THE INTERNET
-          <br />
-          <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-300 bg-clip-text text-transparent">
-            SHOULD ADAPT TO YOU.
-          </span>
-        </h1>
-
-        {/* Description */}
-        <p className="mt-6 max-w-2xl text-lg leading-relaxed text-slate-400">
-          SAARTHI AI helps transform complex digital experiences into simpler,
-          smarter, multilingual, and more accessible experiences.
-        </p>
-
-        {/* Demo Result */}
-        {completed && (
-          <div className="mt-8 max-w-xl rounded-2xl border border-green-400/20 bg-green-400/10 p-5 backdrop-blur">
-            <div className="flex items-center justify-center gap-2 text-green-300">
-              <CheckCircle2 className="h-5 w-5" />
-              <span className="font-semibold">
-                SAARTHI AI Demo Completed Successfully
-              </span>
+      {/* Hero band with Core */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-8">
+        <SectionCard className="lg:col-span-2 flex flex-col justify-between" delay={0}>
+          <div>
+            <div className="flex items-center gap-2 text-core-300 mb-2">
+              <TrendingUp size={18} />
+              <span className="text-sm font-medium">This Week</span>
             </div>
-
-            <p className="mt-2 text-sm text-slate-300">
-              This feature is currently running with demo data. Real AI and
-              backend services can be connected in the next version.
+            <h2 className="font-display text-2xl font-semibold text-white">
+              6 analyses completed · 34 issues resolved
+            </h2>
+            <p className="text-muted mt-2">
+              You've improved accessibility scores by an average of 34 points across analyzed sites.
             </p>
           </div>
-        )}
+          <div className="mt-6 grid grid-cols-3 gap-4">
+            <Stat label="Sites Analyzed" value="6" icon={Globe} />
+            <Stat label="Docs Processed" value="4" icon={FileText} />
+            <Stat label="Translations" value="12" icon={Languages} />
+          </div>
+        </SectionCard>
 
-        {/* Button */}
-        <button
-          onClick={handleDemo}
-          disabled={isProcessing}
-          className="mt-8 flex items-center gap-3 rounded-xl bg-white px-6 py-4 font-semibold text-slate-950 transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {isProcessing ? (
-            <>
-              <Loader2 className="h-5 w-5 animate-spin" />
-              SAARTHI IS PROCESSING...
-            </>
-          ) : completed ? (
-            <>
-              RUN AGAIN
-              <Play className="h-5 w-5" />
-            </>
-          ) : (
-            <>
-              EXPERIENCE SAARTHI
-              <ArrowRight className="h-5 w-5" />
-            </>
-          )}
-        </button>
+        <SectionCard className="flex flex-col items-center justify-center" delay={0.1}>
+          <SaarthiCore state="idle" size={200} showStars={false} />
+          <div className="mt-4 text-center">
+            <div className="font-display text-lg font-semibold text-white">SAARTHI Core</div>
+            <div className="text-sm text-slate-500">Idle · Ready to assist</div>
+          </div>
+        </SectionCard>
+      </div>
 
-        {/* Features */}
-        <div className="mt-14 grid max-w-4xl grid-cols-1 gap-4 md:grid-cols-3">
-          {[
-            ["WEBSITE", "Analyze accessibility and identify barriers."],
-            ["DOCUMENT", "Understand complex documents easily."],
-            ["AI ASSISTANT", "Get intelligent accessibility guidance."],
-          ].map(([title, text]) => (
-            <div
-              key={title}
-              className="rounded-2xl border border-white/10 bg-white/5 p-6 text-left backdrop-blur transition hover:-translate-y-1 hover:border-blue-400/40"
+      {/* Quick actions */}
+      <h2 className="section-title mb-4">Quick Actions</h2>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-8">
+        {QUICK_ACTIONS.map((a, i) => (
+          <motion.div
+            key={a.title}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.06 }}
+          >
+            <Link
+              to={a.to}
+              className="group flex items-center gap-4 card hover:border-core-400/40 hover:bg-ink-700/60 transition-all"
             >
-              <h3 className="font-bold text-blue-300">{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-400">
-                {text}
-              </p>
+              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/5 border border-white/10 ${a.color} group-hover:scale-110 transition-transform`}>
+                <a.icon size={22} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-medium text-white">{a.title}</h3>
+                <p className="text-sm text-slate-400 truncate">{a.desc}</p>
+              </div>
+              <ArrowRight size={18} className="text-slate-500 group-hover:text-core-300 transition" />
+            </Link>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Recent activity */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <SectionCard title="Recent Activity" icon={<Clock size={18} />} delay={0}>
+          <div className="space-y-3">
+            {DEMO_HISTORY.slice(0, 5).map((h) => (
+              <div key={h.id} className="flex items-center gap-3 rounded-xl border border-white/5 bg-ink-900/40 p-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-core-500/10 text-core-300">
+                  {h.type === 'website' && <Globe size={16} />}
+                  {h.type === 'document' && <FileText size={16} />}
+                  {h.type === 'voice' && <Mic size={16} />}
+                  {h.type === 'translation' && <Languages size={16} />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm text-white truncate">{h.title}</div>
+                  <div className="text-xs text-slate-500">{h.detail}</div>
+                </div>
+                {h.score && (
+                  <span className={`chip ${h.score >= 80 ? 'text-success-400' : h.score >= 60 ? 'text-warning-400' : 'text-danger-400'}`}>
+                    {h.score}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Accessibility Health" icon={<CheckCircle2 size={18} />} delay={0.1}>
+          <div className="space-y-4">
+            <HealthBar label="Color Contrast" value={72} />
+            <HealthBar label="Keyboard Nav" value={85} />
+            <HealthBar label="Alt Text" value={48} warning />
+            <HealthBar label="Form Labels" value={91} />
+            <HealthBar label="Heading Structure" value={67} />
+            <div className="mt-4 flex items-center gap-2 rounded-xl border border-warning-500/20 bg-warning-500/5 p-3 text-sm text-warning-400">
+              <AlertTriangle size={16} />
+              Alt text coverage needs attention across analyzed sites.
             </div>
-          ))}
-        </div>
-      </section>
-    </main>
+          </div>
+        </SectionCard>
+      </div>
+    </div>
+  );
+}
+
+function Stat({ label, value, icon: Icon }: { label: string; value: string; icon: typeof Globe }) {
+  return (
+    <div className="rounded-xl border border-white/5 bg-ink-900/40 p-4">
+      <Icon size={18} className="text-core-400 mb-2" />
+      <div className="font-display text-2xl font-bold text-white">{value}</div>
+      <div className="text-xs text-slate-500">{label}</div>
+    </div>
+  );
+}
+
+function HealthBar({ label, value, warning }: { label: string; value: number; warning?: boolean }) {
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between text-sm">
+        <span className="text-slate-300">{label}</span>
+        <span className={warning ? 'text-warning-400' : 'text-slate-400'}>{value}%</span>
+      </div>
+      <div className="h-2 rounded-full bg-white/5 overflow-hidden">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${value}%` }}
+          transition={{ duration: 0.8 }}
+          className={`h-full rounded-full ${warning ? 'bg-warning-500' : 'bg-core-500'}`}
+        />
+      </div>
+    </div>
   );
 }
