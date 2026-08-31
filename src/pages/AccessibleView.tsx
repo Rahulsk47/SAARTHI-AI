@@ -55,17 +55,28 @@ const STAGES = [
 ];
 
 export default function AccessibleView() {
-  const [searchParams] = useSearchParams();
-  const targetUrl = searchParams.get('url') || 'https://www.india.gov.in';
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialUrl = searchParams.get('url') || 'https://www.india.gov.in';
 
   const { settings } = useA11y();
+  const [inputUrl, setInputUrl] = useState(initialUrl);
+  const [targetUrl, setTargetUrl] = useState(initialUrl);
   const [stage, setStage] = useState(0);
   const [autoPlay, setAutoPlay] = useState(false);
   const [reading, setReading] = useState(false);
   const [fontSizeMultiplier, setFontSizeMultiplier] = useState(settings.fontScale || 1);
   const [highContrast, setHighContrast] = useState(settings.highContrast || false);
+  const [dyslexicFont, setDyslexicFont] = useState(false);
   const [transformedData, setTransformedData] = useState<AccessibleTransformResult | null>(null);
   const [loadingTransform, setLoadingTransform] = useState(false);
+
+  const POPULAR_PORTALS = [
+    { label: 'India.gov.in', url: 'https://www.india.gov.in' },
+    { label: 'UIDAI / Aadhaar', url: 'https://uidai.gov.in' },
+    { label: 'CoWIN Portal', url: 'https://www.cowin.gov.in' },
+    { label: 'DigiLocker', url: 'https://www.digilocker.gov.in' },
+    { label: 'Scholarships Portal', url: 'https://scholarships.gov.in' },
+  ];
 
   useEffect(() => {
     setHighContrast(settings.highContrast);
@@ -77,26 +88,35 @@ export default function AccessibleView() {
     }
   }, [settings.fontScale]);
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadTransformation = async (urlToTransform: string) => {
     setLoadingTransform(true);
-    transformAccessible(targetUrl)
-      .then((res) => {
-        if (isMounted && res) {
-          setTransformedData(res);
-        }
-      })
-      .catch((err) => {
-        console.error('Transform error:', err);
-      })
-      .finally(() => {
-        if (isMounted) setLoadingTransform(false);
-      });
+    try {
+      const res = await transformAccessible(urlToTransform);
+      if (res) {
+        setTransformedData(res);
+      }
+    } catch (err) {
+      console.error('Transform error:', err);
+    } finally {
+      setLoadingTransform(false);
+    }
+  };
 
-    return () => {
-      isMounted = false;
-    };
+  useEffect(() => {
+    void loadTransformation(targetUrl);
   }, [targetUrl]);
+
+  const handleApplyUrl = (newUrl: string) => {
+    let clean = newUrl.trim();
+    if (!clean) return;
+    if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
+      clean = `https://${clean}`;
+    }
+    setInputUrl(clean);
+    setTargetUrl(clean);
+    setSearchParams({ url: clean });
+    setStage(0);
+  };
 
   useEffect(() => {
     if (!autoPlay) return;
@@ -122,7 +142,7 @@ export default function AccessibleView() {
         return;
       }
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.95;
+      utterance.rate = 0.92;
       utterance.onend = () => setReading(false);
       utterance.onerror = () => setReading(false);
       setReading(true);
@@ -145,6 +165,53 @@ export default function AccessibleView() {
         backTo="/results"
         backLabel="Back to Results"
       />
+
+      {/* Target URL Selector & Presets */}
+      <div className="card mb-6 p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <input
+            type="url"
+            value={inputUrl}
+            onChange={(e) => setInputUrl(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleApplyUrl(inputUrl);
+              }
+            }}
+            placeholder="Enter public website URL (e.g. https://www.india.gov.in)"
+            className="input flex-1"
+            aria-label="Website URL to transform into accessible view"
+          />
+          <button
+            type="button"
+            onClick={() => handleApplyUrl(inputUrl)}
+            disabled={loadingTransform}
+            className="btn-primary flex items-center justify-center gap-2 whitespace-nowrap"
+          >
+            {loadingTransform ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+            Transform URL
+          </button>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-slate-400">Quick Portals:</span>
+          {POPULAR_PORTALS.map((portal) => (
+            <button
+              key={portal.url}
+              type="button"
+              onClick={() => handleApplyUrl(portal.url)}
+              className={`chip border text-xs transition ${
+                targetUrl === portal.url
+                  ? 'border-core-400 bg-core-500/20 text-core-200'
+                  : 'border-white/10 text-slate-400 hover:text-white'
+              }`}
+            >
+              {portal.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Stage progress */}
       <div className="mb-8 flex flex-wrap items-center gap-2">
@@ -239,6 +306,17 @@ export default function AccessibleView() {
                   title="Increase font size"
                 >
                   <ZoomIn size={13} /> A+
+                </button>
+                <button
+                  onClick={() => setDyslexicFont(!dyslexicFont)}
+                  className={`chip border ${
+                    dyslexicFont
+                      ? 'border-core-400 bg-core-500/20 text-core-200 font-bold'
+                      : 'border-white/10 text-slate-300'
+                  }`}
+                  title="Toggle Dyslexia-friendly reading mode"
+                >
+                  <Type size={13} /> Dyslexia Font
                 </button>
                 <button
                   onClick={() => setHighContrast(!highContrast)}
@@ -348,7 +426,7 @@ export default function AccessibleView() {
                 exit={{ opacity: 0, y: -16 }}
                 className={`card ${
                   highContrast ? 'border-2 border-yellow-400 bg-black text-yellow-300' : ''
-                }`}
+                } ${dyslexicFont ? 'tracking-wider font-sans' : ''}`}
                 style={{ fontSize: `${fontSizeMultiplier * 100}%` }}
               >
                 <div className="mb-4 flex items-center justify-between text-success-400">
